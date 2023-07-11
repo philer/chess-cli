@@ -31,14 +31,14 @@ typedef optional<Piece> Board[8][8];
 
 void init_board(Board board) {
   // empty squares
-  for (unsigned short rank = 2; rank < 6; ++rank) {
-    for (unsigned short file = 0; file < 8; ++file) {
+  for (ushort rank = 2; rank < 6; ++rank) {
+    for (ushort file = 0; file < 8; ++file) {
       board[rank][file] = nullopt;
     }
   }
 
   // pawns
-  for (unsigned short file = 0; file < 8; ++file) {
+  for (ushort file = 0; file < 8; ++file) {
     board[1][file] = white_pawn;
     board[6][file] = black_pawn;
   }
@@ -88,17 +88,17 @@ map<Piece, Piece> inverted_pieces{
     {black_knight, white_knight}, {black_pawn, white_pawn},
 };
 
+const ushort forward8[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+const ushort reverse8[8] = {7, 6, 5, 4, 3, 2, 1, 0};
+
 void print_board(Board board, bool as_white = true) {
   bool black_square = true;
-  // for (unsigned short rank = 0; rank < 8; ++rank) {
+  // std::ranges::views has shitty types?
   // auto ranks = as_white ? views::reverse(views::iota(0, 8)) : views::iota(0,
   // 8);
-  unsigned short start_rank = as_white ? 7 : 0;
-  unsigned short rank_step = as_white ? -1 : 1;
-  // yikes
-  for (unsigned short rank = start_rank; rank + rank_step != 7 - start_rank;
-       rank += rank_step) {
-    for (unsigned short file = 0; file < 8; ++file) {
+  for (ushort rank : as_white ? reverse8 : forward8) {
+    cout << rank + 1 << ' ';
+    for (ushort file : as_white ? forward8 : reverse8) {
       string piece_character;
       if (board[rank][file] != nullopt) {
         Piece piece = board[rank][file].value();
@@ -114,16 +114,17 @@ void print_board(Board board, bool as_white = true) {
       //                 .and_then([](Piece piece) { return pieces[piece]; })
       //                 .value_or(" ");
       if (black_square) {
-        cout << piece_character << " ";
+        cout << piece_character << ' ';
       } else {
-        cout << ANSI_INVERT << piece_character << " " << ANSI_RESET;
+        cout << ANSI_INVERT << piece_character << ' ' << ANSI_RESET;
       }
       black_square = !black_square;
     }
     black_square = !black_square;
     cout << "\n";
   }
-  cout << endl;
+  cout << "  " << (as_white ? "a b c d e f g h" : "h g f e d c b a") << "\n"
+       << endl;
 }
 
 int main() {
@@ -136,6 +137,7 @@ int main() {
   Board board;
   init_board(board);
   print_board(board);
+  print_board(board, false);
 
   return 0;
 }
