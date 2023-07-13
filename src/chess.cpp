@@ -1,5 +1,3 @@
-/** This file is full of random experiments – read it at your own risk. */
-
 #include <iostream>
 #include <map>
 #include <optional>
@@ -7,6 +5,8 @@
 #include <string>
 
 using namespace std;
+
+/** This file is full of random experiments – read it at your own risk. */
 
 // ♔ ♕ ♖ ♗ ♘ ♙ ♚ ♛ ♜ ♝ ♞ ♟︎
 
