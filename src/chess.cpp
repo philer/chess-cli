@@ -70,6 +70,108 @@ void init_board(Board board) {
   // copy(black_pieces[0], black_pieces[7], board[7]);
 }
 
+static const string FILE_CHARS = "abcdefgh";
+static const string RANK_CHARS = "12345678";
+
+// Disallowing lower case piece letters for now.
+// Ambiguous case: "bc6" could be a bishop or a pawn capture
+static const string PIECE_CHARS = "NBRQK";
+
+inline void check_square_chars(const char file, const char rank,
+                               const string move) {
+  if (FILE_CHARS.find(file) == string::npos ||
+      RANK_CHARS.find(rank) == string::npos) {
+    throw "Invalid move '" + move + "'";
+  }
+}
+
+void decode_move(string move, const bool as_white) {
+
+  char piece;
+  char from_rank, from_file;
+  char to_rank, to_file;
+  char promotion;
+  bool check = false;
+  bool castle_short = false;
+  bool castle_long = false;
+
+  if (move[move.length() - 1] == '+') {
+    check = true;
+    move = move.substr(0, move.length() - 1);
+  }
+
+  switch (move.length()) {
+    // TODO shortened pawn captures ("exd", "ed")
+  case 2:
+    // Pawn move, e.g. "e4";
+    piece = 'P';
+    to_file = move[0];
+    to_rank = move[1];
+    check_square_chars(to_file, to_rank, move);
+    break;
+  case 3:
+    if (move == "0-0" || move == "O-O") {
+      castle_short = true;
+    } else if (PIECE_CHARS.find(move[0]) != string::npos) {
+      // Basic piece move, e.g. "Nf6"
+      piece = move[0];
+      to_file = move[1];
+      to_rank = move[2];
+      check_square_chars(to_file, to_rank, move);
+    } else if (PIECE_CHARS.find(move[2]) != string::npos) {
+      // Promotion
+      to_file = move[0];
+      to_rank = move[1];
+      promotion = move[2];
+      check_square_chars(to_file, to_rank, move);
+    }
+    break;
+  case 4:
+    if (move[1] == 'x') {
+      // Basic capture
+      if (PIECE_CHARS.find(move[0]) != string::npos) {
+        piece = move[0];
+      } else if (FILE_CHARS.find(move[0]) != string::npos) {
+        piece = 'P';
+        from_file = move[0];
+      } else {
+        throw "Invalid move '" + move + "'";
+      }
+    } else {
+      // Piece move with qualified starting rank or file
+      piece = move[0];
+      if (PIECE_CHARS.find(piece) == string::npos) {
+        throw "Invalid move '" + move + "'";
+      }
+      if (FILE_CHARS.find(move[1] != string::npos)) {
+        from_file = move[1];
+      } else if (RANK_CHARS.find(move[1] != string::npos)) {
+        from_rank = move[1];
+      } else {
+        throw "Invalid move '" + move + "'";
+      }
+    }
+    break;
+  case 5:
+    if (move == "0-0-0" || move == "O-O-O") {
+      castle_long = true;
+    } else if (move[1] == 'x') {
+      // Pawn capture with promotion ("dxe8Q")
+    } else if (move[2] == 'x') {
+      // Piece capture with qualified starting rank or file ("Qhxe1")
+    } else {
+      // Piece move with qualified starting rank and file ("Qh4e1")
+    }
+    break;
+  case 6:
+    // Piece capture with qualified starting rank and file ""Qh4xe1""
+    break;
+  default:
+    throw "Invalid move '" + move + "'";
+    break;
+  }
+}
+
 // const string ANSI_RED = "\033[31m";
 const string ANSI_INVERT = "\033[0;0;7m";
 const string ANSI_RESET = "\033[0m";
@@ -187,6 +289,8 @@ int main() {
   Board board;
   init_board(board);
   print_board(board);
+
+  decode_move("a1", true);
 
   return 0;
 }
