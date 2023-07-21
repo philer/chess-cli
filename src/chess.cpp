@@ -1,3 +1,4 @@
+#include <array>
 #include <iostream>
 #include <map>
 #include <optional>
@@ -91,14 +92,27 @@ map<Piece, Piece> inverted_pieces{
 const ushort forward8[8] = {0, 1, 2, 3, 4, 5, 6, 7};
 const ushort reverse8[8] = {7, 6, 5, 4, 3, 2, 1, 0};
 
-void print_board(Board board, bool as_white = true) {
+const ushort BOARD_HEADER_HEIGHT = 2;
+const ushort BOARD_CONTENT_HEIGHT = 8;
+const ushort BOARD_FOOTER_HEIGHT = 1;
+const ushort BOARD_HEIGHT =
+    BOARD_HEADER_HEIGHT + BOARD_CONTENT_HEIGHT + BOARD_FOOTER_HEIGHT;
+
+array<string, BOARD_HEIGHT> board_to_lines(const Board board,
+                                           const bool as_white = true) {
+  array<string, BOARD_HEIGHT> lines;
+  lines[0] = as_white ? "       WHITE        " : "       BLACK        ";
+  lines[1] = as_white ? "  a b c d e f g h   " : "  h g f e d c b a   ";
+  lines[10] = as_white ? "  a b c d e f g h   " : "  h g f e d c b a   ";
+
   bool black_square = true;
   // std::ranges::views has shitty types?
   // auto ranks = as_white ? views::reverse(views::iota(0, 8)) : views::iota(0,
   // 8);
-  for (ushort rank : as_white ? reverse8 : forward8) {
-    cout << rank + 1 << ' ';
-    for (ushort file : as_white ? forward8 : reverse8) {
+  for (const ushort rank : as_white ? reverse8 : forward8) {
+    const ushort line = (as_white ? 7 - rank : rank) + BOARD_HEADER_HEIGHT;
+    lines[line] = to_string(rank + 1) + " ";
+    for (const ushort file : as_white ? forward8 : reverse8) {
       string piece_character;
       if (board[rank][file] != nullopt) {
         Piece piece = board[rank][file].value();
@@ -114,30 +128,65 @@ void print_board(Board board, bool as_white = true) {
       //                 .and_then([](Piece piece) { return pieces[piece]; })
       //                 .value_or(" ");
       if (black_square) {
-        cout << piece_character << ' ';
+        lines[line] += piece_character + " ";
       } else {
-        cout << ANSI_INVERT << piece_character << ' ' << ANSI_RESET;
+        lines[line] += ANSI_INVERT + piece_character + " " + ANSI_RESET;
       }
       black_square = !black_square;
     }
     black_square = !black_square;
-    cout << "\n";
+    lines[line] += " " + to_string(rank + 1);
   }
-  cout << "  " << (as_white ? "a b c d e f g h" : "h g f e d c b a") << "\n"
-       << endl;
+
+  return lines;
+}
+
+string concat(string a, string b) { return a + b; }
+
+template <size_t size>
+array<string, size> concat_lines(const array<string, size> a,
+                                 const array<string, size> b) {
+  array<string, size> result = {};
+  for (int i = 0; i < size; ++i) {
+    result[i] = a[i] + b[i];
+  }
+  return result;
+}
+
+template <size_t size> string join_lines(const array<string, size> lines) {
+  string result = "";
+  for (string line : lines) {
+    result += line + "\n";
+  }
+  return result;
+}
+
+void print_board(const Board board) {
+  array<string, BOARD_HEIGHT> gap;
+  fill(gap.begin(), gap.end(), "   ");
+  cout << join_lines(concat_lines<BOARD_HEIGHT>(
+      concat_lines<BOARD_HEIGHT>(board_to_lines(board), gap),
+      board_to_lines(board, false)));
 }
 
 int main() {
-  cout << pieces[white_king] << pieces[white_queen] << pieces[white_rook]
-       << pieces[white_bishop] << pieces[white_knight] << pieces[white_pawn]
-       << pieces[black_king] << pieces[black_queen] << pieces[black_rook]
-       << pieces[black_bishop] << pieces[black_knight] << pieces[black_pawn]
-       << endl;
+  // cout << concat("abc", "def");
+  // array<string, 2> a = {"abc", "ABC"};
+  // array<string, 2> b = {"def", "DEFGH"};
+  // cout << join_lines(concat_lines<2>(a, b));
+
+  // cout << pieces[white_king] << pieces[white_queen] << pieces[white_rook]
+  //      << pieces[white_bishop] << pieces[white_knight] << pieces[white_pawn]
+  //      << pieces[black_king] << pieces[black_queen] << pieces[black_rook]
+  //      << pieces[black_bishop] << pieces[black_knight] << pieces[black_pawn]
+  //      << endl;
+
+  // cout << join_lines(board_to_lines(board));
+  // cout << join_lines(board_to_lines(board, false));
 
   Board board;
   init_board(board);
   print_board(board);
-  print_board(board, false);
 
   return 0;
 }
