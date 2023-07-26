@@ -5,16 +5,11 @@
 #include <ranges>
 #include <string>
 #include <vector>
-// #include <format>
 
 using namespace std;
 
 /** This file is full of random experiments – read it at your own risk. */
 
-// ♔ ♕ ♖ ♗ ♘ ♙ ♚ ♛ ♜ ♝ ♞ ♟︎
-
-// enum Piece { queen, king, rook, bishop, knight, pawn };
-// enum Color { white, black };
 enum Piece {
   white_king,
   white_queen,
@@ -65,11 +60,6 @@ void init_board(Board board) {
   board[7][5] = black_bishop;
   board[7][6] = black_knight;
   board[7][7] = black_rook;
-  // Piece black_pieces[8] = {black_rook, black_knight, black_bishop,
-  // black_queen,
-  //                          black_king, black_bishop, black_knight,
-  //                          black_rook};
-  // copy(black_pieces[0], black_pieces[7], board[7]);
 }
 
 static const string FILE_CHARS = "abcdefgh";
@@ -296,9 +286,6 @@ array<string, BOARD_HEIGHT> board_to_lines(const Board board,
   lines[10] = as_white ? "  a b c d e f g h   " : "  h g f e d c b a   ";
 
   bool black_square = true;
-  // std::ranges::views has shitty types?
-  // auto ranks = as_white ? views::reverse(views::iota(0, 8)) : views::iota(0,
-  // 8);
   for (const ushort rank : as_white ? reverse8 : forward8) {
     const ushort line = (as_white ? 7 - rank : rank) + BOARD_HEADER_HEIGHT;
     lines[line] = to_string(rank + 1) + " ";
@@ -313,10 +300,6 @@ array<string, BOARD_HEIGHT> board_to_lines(const Board board,
       } else {
         piece_character = " ";
       }
-      // c++23
-      // string pc = board[rank][file]
-      //                 .and_then([](Piece piece) { return pieces[piece]; })
-      //                 .value_or(" ");
       if (black_square) {
         lines[line] += piece_character + " ";
       } else {
@@ -360,20 +343,6 @@ void print_board(const Board board) {
 }
 
 int main() {
-  // cout << concat("abc", "def");
-  // array<string, 2> a = {"abc", "ABC"};
-  // array<string, 2> b = {"def", "DEFGH"};
-  // cout << join_lines(concat_lines<2>(a, b));
-
-  // cout << pieces[white_king] << pieces[white_queen] << pieces[white_rook]
-  //      << pieces[white_bishop] << pieces[white_knight] << pieces[white_pawn]
-  //      << pieces[black_king] << pieces[black_queen] << pieces[black_rook]
-  //      << pieces[black_bishop] << pieces[black_knight] << pieces[black_pawn]
-  //      << endl;
-
-  // cout << join_lines(board_to_lines(board));
-  // cout << join_lines(board_to_lines(board, false));
-
   Board board;
   init_board(board);
 
