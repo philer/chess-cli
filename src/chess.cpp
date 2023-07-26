@@ -350,11 +350,12 @@ int main() {
   try {
     bool is_white = true;
     uint move_no = 1;
-    for (string move : game) {
+    string move;
+    while (true) {
       print_board(board);
       cout << "\nMove " << move_no << ": " << (is_white ? "White" : "Black")
            << "'s turn" << endl;
-      cout << "> " << move << endl;
+      cin >> move;
 
       apply_move(board, decode_move(board, move, is_white));
       is_white = !is_white;
