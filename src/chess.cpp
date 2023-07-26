@@ -4,6 +4,7 @@
 #include <optional>
 #include <ranges>
 #include <string>
+#include <vector>
 // #include <format>
 
 using namespace std;
@@ -118,107 +119,145 @@ void check_has_piece(const Board board, const char file, const char rank,
   }
 }
 
-void decode_move(const Board board, const string move, const bool as_white) {
-
+struct Move {
+  string algebraic;
+  char from_file;
+  char from_rank;
+  char to_file;
+  char to_rank;
+  bool check;
+  bool castle_long;
+  bool castle_short;
+  // bool en_passant;  // TODO
   Piece piece;
-  char from_rank, from_file;
-  char to_rank, to_file;
-  char promotion;
-  bool check = false;
-  bool castle_short = false;
-  bool castle_long = false;
+  optional<Piece> capture;
+  optional<Piece> promotion;
+};
+
+Move decode_move(const Board board, const string move, const bool as_white) {
+  Move mv;
+  mv.algebraic = move;
+  mv.check = false;
+  mv.castle_long = false;
+  mv.castle_short = false;
+
   const short forwards = as_white ? 1 : -1;
 
-  string mv = move;
+  // Without check+
+  string move_ = move;
 
-  if (mv[mv.length() - 1] == '+') {
-    check = true;
-    mv = mv.substr(0, mv.length() - 1);
+  if (move_[move_.length() - 1] == '+') {
+    mv.check = true;
+    move_ = move_.substr(0, move_.length() - 1);
   }
 
-  switch (mv.length()) {
+  switch (move_.length()) {
     // TODO shortened pawn captures ("exd", "ed")
   case 2:
     // Pawn move, e.g. "e4";
-    piece = get_piece('P', as_white);
-    to_file = mv[0];
-    to_rank = mv[1];
-    check_square_chars(to_file, to_rank, mv);
-    from_file = to_file;
+    mv.piece = get_piece('P', as_white);
+    mv.to_file = move_[0];
+    mv.to_rank = move_[1];
+    check_square_chars(mv.to_file, mv.to_rank, move_);
+    mv.from_file = mv.to_file;
 
-    if (get_piece(board, from_file, to_rank - forwards) == piece) {
-      from_rank = to_rank - forwards;
-    } else if ((to_rank == '4' && as_white || to_rank == '5' && !as_white) &&
-               !get_piece(board, from_file, to_rank - forwards).has_value() &&
-               get_piece(board, from_file, to_rank - 2 * forwards) == piece) {
-      from_rank = to_rank - 2 * forwards;
+    if (get_piece(board, mv.from_file, mv.to_rank - forwards) == mv.piece) {
+      mv.from_rank = mv.to_rank - forwards;
+    } else if ((mv.to_rank == '4' && as_white ||
+                mv.to_rank == '5' && !as_white) &&
+               !get_piece(board, mv.from_file, mv.to_rank - forwards)
+                    .has_value() &&
+               get_piece(board, mv.from_file, mv.to_rank - 2 * forwards) ==
+                   mv.piece) {
+      mv.from_rank = mv.to_rank - 2 * forwards;
     } else {
-      throw string("Invalid move: No eligible Pawn on ") + from_file +
-          (char)(to_rank - forwards) + " or " + from_file +
-          (char)(to_rank - 2 * forwards);
+      throw string("Invalid move: No eligible Pawn on ") + mv.from_file +
+          (char)(mv.to_rank - forwards) + " or " + mv.from_file +
+          (char)(mv.to_rank - 2 * forwards);
     }
     break;
   case 3:
-    if (mv == "0-0" || mv == "O-O") {
-      castle_short = true;
-    } else if (PIECE_CHARS.find(mv[0]) != string::npos) {
+    if (move_ == "0-0" || move_ == "O-O") {
+      mv.castle_short = true;
+    } else if (PIECE_CHARS.find(move_[0]) != string::npos) {
       // Basic piece move, e.g. "Nf6"
-      piece = get_piece(mv[0], as_white);
-      to_file = mv[1];
-      to_rank = mv[2];
-      check_square_chars(to_file, to_rank, mv);
-    } else if (PIECE_CHARS.find(mv[2]) != string::npos) {
+      mv.piece = get_piece(move_[0], as_white);
+      mv.to_file = move_[1];
+      mv.to_rank = move_[2];
+      check_square_chars(mv.to_file, mv.to_rank, move_);
+      // TODO check available piece
+    } else if (PIECE_CHARS.find(move_[2]) != string::npos) {
       // Promotion
-      to_file = mv[0];
-      to_rank = mv[1];
-      promotion = mv[2];
-      check_square_chars(to_file, to_rank, mv);
+      mv.to_file = move_[0];
+      mv.to_rank = move_[1];
+      mv.promotion = get_piece(move_[2], as_white);
+      check_square_chars(mv.to_file, mv.to_rank, move_);
+      // TODO check available piece
     }
     break;
   case 4:
-    if (mv[1] == 'x') {
+    if (move_[1] == 'x') {
       // Basic capture
-      if (PIECE_CHARS.find(mv[0]) != string::npos) {
-        piece = get_piece(mv[0], as_white);
-      } else if (FILE_CHARS.find(mv[0]) != string::npos) {
-        piece = get_piece('P', as_white);
-        from_file = mv[0];
+      if (PIECE_CHARS.find(move_[0]) != string::npos) {
+        mv.piece = get_piece(move_[0], as_white);
+      } else if (FILE_CHARS.find(move_[0]) != string::npos) {
+        mv.piece = get_piece('P', as_white);
+        mv.from_file = move_[0];
       } else {
-        throw string("Invalid move '" + mv + "'");
+        throw string("Invalid move '" + move_ + "'");
       }
     } else {
       // Piece move with qualified starting rank or file
-      piece = get_piece(mv[0], as_white);
-      if (PIECE_CHARS.find(piece) == string::npos) {
-        throw string("Invalid move '" + mv + "'");
+      mv.piece = get_piece(move_[0], as_white);
+      if (PIECE_CHARS.find(mv.piece) == string::npos) {
+        throw string("Invalid move '" + move_ + "'");
       }
-      if (FILE_CHARS.find(mv[1] != string::npos)) {
-        from_file = mv[1];
-      } else if (RANK_CHARS.find(mv[1] != string::npos)) {
-        from_rank = mv[1];
+      if (FILE_CHARS.find(move_[1] != string::npos)) {
+        mv.from_file = move_[1];
+      } else if (RANK_CHARS.find(move_[1] != string::npos)) {
+        mv.from_rank = move_[1];
       } else {
-        throw string("Invalid move '" + mv + "'");
+        throw string("Invalid move '" + move_ + "'");
       }
     }
     break;
   case 5:
-    if (mv == "0-0-0" || mv == "O-O-O") {
-      castle_long = true;
-    } else if (mv[1] == 'x') {
+    if (move_ == "0-0-0" || move_ == "O-O-O") {
+      mv.castle_long = true;
+    } else if (move_[1] == 'x') {
       // Pawn capture with promotion ("dxe8Q")
-    } else if (mv[2] == 'x') {
+      // TODO
+    } else if (move_[2] == 'x') {
       // Piece capture with qualified starting rank or file ("Qhxe1")
+      // TODO
     } else {
       // Piece move with qualified starting rank and file ("Qh4e1")
+      // TODO
     }
     break;
   case 6:
     // Piece capture with qualified starting rank and file ""Qh4xe1""
+    // TODO
     break;
   default:
-    throw string("Invalid move '" + mv + "'");
+    throw string("Invalid move '" + move_ + "'");
     break;
   }
+  return mv;
+}
+
+void apply_move(Board board, const Move move) {
+  if (move.castle_long) {
+    // TODO
+  } else if (move.castle_short) {
+    // TODO
+  }
+
+  board[move.from_rank - '1'][move.from_file - 'a'] = nullopt;
+  board[move.to_rank - '1'][move.to_file - 'a'] =
+      move.promotion.value_or(move.piece);
+
+  // TODO capture en passant
 }
 
 // const string ANSI_RED = "\033[31m";
@@ -337,10 +376,23 @@ int main() {
 
   Board board;
   init_board(board);
-  print_board(board);
 
+  vector<string> game = {"d4", "d5", "e3", "c6"};
   try {
-    decode_move(board, "e4", true);
+    bool is_white = true;
+    uint move_no = 1;
+    for (string move : game) {
+      print_board(board);
+      cout << "\nMove " << move_no << ": " << (is_white ? "White" : "Black")
+           << "'s turn" << endl;
+      cout << "> " << move << endl;
+
+      apply_move(board, decode_move(board, move, is_white));
+      is_white = !is_white;
+      if (is_white) {
+        move_no += 1;
+      }
+    }
   } catch (string err) {
     cout << err << endl;
   }
