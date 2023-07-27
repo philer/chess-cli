@@ -8,7 +8,17 @@
 
 using namespace std;
 
-/** This file is full of random experiments – read it at your own risk. */
+/**
+ * Play interactive chess on the command line.
+ *
+ * This program was created for training purposes and is full of experiments –
+ * read it at your own risk.
+ *
+ * Future ideas:
+ * + highlight last move
+ * + highlight check
+ * + highlight available moves for a selected piece
+ * */
 
 enum Piece {
   white_king,
@@ -31,51 +41,40 @@ void init_board(Board board) {
   // empty squares
   for (ushort rank = 2; rank < 6; ++rank) {
     for (ushort file = 0; file < 8; ++file) {
-      board[rank][file] = nullopt;
+      board[file][rank] = nullopt;
     }
   }
 
   // pawns
   for (ushort file = 0; file < 8; ++file) {
-    board[1][file] = white_pawn;
-    board[6][file] = black_pawn;
+    board[file][1] = white_pawn;
+    board[file][6] = black_pawn;
   }
 
   // white pieces
   board[0][0] = white_rook;
-  board[0][1] = white_knight;
-  board[0][2] = white_bishop;
-  board[0][3] = white_queen;
-  board[0][4] = white_king;
-  board[0][5] = white_bishop;
-  board[0][6] = white_knight;
-  board[0][7] = white_rook;
+  board[1][0] = white_knight;
+  board[2][0] = white_bishop;
+  board[3][0] = white_queen;
+  board[4][0] = white_king;
+  board[5][0] = white_bishop;
+  board[6][0] = white_knight;
+  board[7][0] = white_rook;
 
   // black pieces
-  board[7][0] = black_rook;
-  board[7][1] = black_knight;
-  board[7][2] = black_bishop;
-  board[7][3] = black_queen;
-  board[7][4] = black_king;
-  board[7][5] = black_bishop;
-  board[7][6] = black_knight;
+  board[0][7] = black_rook;
+  board[1][7] = black_knight;
+  board[2][7] = black_bishop;
+  board[3][7] = black_queen;
+  board[4][7] = black_king;
+  board[5][7] = black_bishop;
+  board[6][7] = black_knight;
   board[7][7] = black_rook;
 }
-
-static const string FILE_CHARS = "abcdefgh";
-static const string RANK_CHARS = "12345678";
 
 // Disallowing lower case piece letters for now.
 // Ambiguous case: "bc6" could be a bishop or a pawn capture
 static const string PIECE_CHARS = "NBRQK";
-
-inline void check_square_chars(const char file, const char rank,
-                               const string move) {
-  if (FILE_CHARS.find(file) == string::npos ||
-      RANK_CHARS.find(rank) == string::npos) {
-    throw string("Invalid move '" + move + "'");
-  }
-}
 
 Piece get_piece(const char piece_character, const bool as_white) {
   switch (piece_character) {
@@ -98,23 +97,32 @@ Piece get_piece(const char piece_character, const bool as_white) {
   }
 }
 
-optional<Piece> get_piece(const Board board, const char file, const char rank) {
-  return board[rank - '1'][file - 'a'];
+struct Square {
+  ushort file;
+  ushort rank;
+};
+
+static const string FILE_CHARS = "abcdefgh";
+static const string RANK_CHARS = "12345678";
+
+inline Square get_square(const char file, const char rank) {
+  if (FILE_CHARS.find(file) == string::npos ||
+      RANK_CHARS.find(rank) == string::npos) {
+    throw string("Not a valid square: '") + file + rank + "'";
+  }
+  return Square{static_cast<ushort>((file - 'a')),
+                static_cast<ushort>((rank - '1'))};
 }
 
-void check_has_piece(const Board board, const char file, const char rank,
-                     const Piece piece) {
-  if (get_piece(board, file, rank) != piece) {
-    throw string("Invalid move: no matching piece on starting square");
-  }
+inline string to_string(Square square) {
+  return {static_cast<char>((square.file + 'a')),
+          static_cast<char>((square.rank + '1'))};
 }
 
 struct Move {
   string algebraic;
-  char from_file;
-  char from_rank;
-  char to_file;
-  char to_rank;
+  Square from;
+  Square to;
   bool check;
   bool castle_long;
   bool castle_short;
@@ -146,42 +154,38 @@ Move decode_move(const Board board, const string move, const bool as_white) {
   case 2:
     // Pawn move, e.g. "e4";
     mv.piece = get_piece('P', as_white);
-    mv.to_file = move_[0];
-    mv.to_rank = move_[1];
-    check_square_chars(mv.to_file, mv.to_rank, move_);
-    mv.from_file = mv.to_file;
+    mv.to = get_square(move_[0], move_[1]);
+    mv.from.file = mv.to.file;
 
-    if (get_piece(board, mv.from_file, mv.to_rank - forwards) == mv.piece) {
-      mv.from_rank = mv.to_rank - forwards;
-    } else if ((mv.to_rank == '4' && as_white ||
-                mv.to_rank == '5' && !as_white) &&
-               !get_piece(board, mv.from_file, mv.to_rank - forwards)
-                    .has_value() &&
-               get_piece(board, mv.from_file, mv.to_rank - 2 * forwards) ==
-                   mv.piece) {
-      mv.from_rank = mv.to_rank - 2 * forwards;
+    if (board[mv.from.file][mv.to.rank - forwards] == mv.piece) {
+      mv.from.rank = mv.to.rank - forwards;
+    } else if ((as_white && mv.to.rank == 3 || !as_white && mv.to.rank == 4) &&
+               !board[mv.from.file][mv.to.rank - forwards].has_value() &&
+               board[mv.from.file][mv.to.rank - 2 * forwards] == mv.piece) {
+      mv.from.rank = mv.to.rank - 2 * forwards;
     } else {
-      throw string("Invalid move: No eligible Pawn on ") + mv.from_file +
-          (char)(mv.to_rank - forwards) + " or " + mv.from_file +
-          (char)(mv.to_rank - 2 * forwards);
+      throw string(
+          "Invalid move: No eligible Pawn on " +
+          to_string(Square{mv.from.file,
+                           static_cast<ushort>(mv.to.rank - forwards)}) +
+          " or " +
+          to_string(Square{mv.from.file,
+                           static_cast<ushort>(mv.to.rank - 2 * forwards)}));
     }
     break;
   case 3:
     if (move_ == "0-0" || move_ == "O-O") {
+      // TODO check castling rights
       mv.castle_short = true;
     } else if (PIECE_CHARS.find(move_[0]) != string::npos) {
       // Basic piece move, e.g. "Nf6"
       mv.piece = get_piece(move_[0], as_white);
-      mv.to_file = move_[1];
-      mv.to_rank = move_[2];
-      check_square_chars(mv.to_file, mv.to_rank, move_);
+      mv.to = get_square(move_[1], move_[2]);
       // TODO check available piece
     } else if (PIECE_CHARS.find(move_[2]) != string::npos) {
       // Promotion
-      mv.to_file = move_[0];
-      mv.to_rank = move_[1];
+      mv.to = get_square(move_[0], move_[1]);
       mv.promotion = get_piece(move_[2], as_white);
-      check_square_chars(mv.to_file, mv.to_rank, move_);
       // TODO check available piece
     }
     break;
@@ -192,7 +196,7 @@ Move decode_move(const Board board, const string move, const bool as_white) {
         mv.piece = get_piece(move_[0], as_white);
       } else if (FILE_CHARS.find(move_[0]) != string::npos) {
         mv.piece = get_piece('P', as_white);
-        mv.from_file = move_[0];
+        ushort file = move_[0] - 'a';
       } else {
         throw string("Invalid move '" + move_ + "'");
       }
@@ -203,9 +207,9 @@ Move decode_move(const Board board, const string move, const bool as_white) {
         throw string("Invalid move '" + move_ + "'");
       }
       if (FILE_CHARS.find(move_[1] != string::npos)) {
-        mv.from_file = move_[1];
+        mv.from.file = move_[1];
       } else if (RANK_CHARS.find(move_[1] != string::npos)) {
-        mv.from_rank = move_[1];
+        ushort rank = move_[1] - '1';
       } else {
         throw string("Invalid move '" + move_ + "'");
       }
@@ -213,6 +217,7 @@ Move decode_move(const Board board, const string move, const bool as_white) {
     break;
   case 5:
     if (move_ == "0-0-0" || move_ == "O-O-O") {
+      // TODO check castling rights
       mv.castle_long = true;
     } else if (move_[1] == 'x') {
       // Pawn capture with promotion ("dxe8Q")
@@ -243,9 +248,8 @@ void apply_move(Board board, const Move move) {
     // TODO
   }
 
-  board[move.from_rank - '1'][move.from_file - 'a'] = nullopt;
-  board[move.to_rank - '1'][move.to_file - 'a'] =
-      move.promotion.value_or(move.piece);
+  board[move.from.file][move.from.rank] = nullopt;
+  board[move.to.file][move.to.rank] = move.promotion.value_or(move.piece);
 
   // TODO capture en passant
 }
@@ -291,8 +295,8 @@ array<string, BOARD_HEIGHT> board_to_lines(const Board board,
     lines[line] = to_string(rank + 1) + " ";
     for (const ushort file : as_white ? forward8 : reverse8) {
       string piece_character;
-      if (board[rank][file] != nullopt) {
-        Piece piece = board[rank][file].value();
+      if (board[file][rank] != nullopt) {
+        Piece piece = board[file][rank].value();
         if (black_square) {
           piece = inverted_pieces[piece];
         }
