@@ -347,25 +347,47 @@ int main() {
   init_board(board);
 
   vector<string> game = {"d4", "d5", "e3", "c6"};
-  try {
-    bool is_white = true;
-    uint move_no = 1;
-    string move;
-    while (true) {
-      print_board(board);
-      cout << "\nMove " << move_no << ": " << (is_white ? "White" : "Black")
-           << "'s turn" << endl;
-      cin >> move;
+  bool is_white = true;
+  uint move_no = 0;
+  string move;
+  Move decoded_move;
 
-      apply_move(board, decode_move(board, move, is_white));
-      is_white = !is_white;
-      if (is_white) {
-        move_no += 1;
+  bool exit = false;
+  while (true) {
+    if (is_white) {
+      move_no += 1;
+      cout << "                { Move " << move_no << " }" << endl;
+    }
+    print_board(board);
+    cout << endl;
+
+    while (true) {
+      try {
+        if (cin.eof()) {
+          exit = true;
+          break;
+        }
+        cout << (is_white ? "White> " : "Black> ");
+        cin >> move;
+        if (move == "exit" || move == "quit" || move == "q" || move == "") {
+          exit = true;
+        } else {
+          decoded_move = decode_move(board, move, is_white);
+        }
+        break;
+      } catch (string err) {
+        cout << err << endl;
       }
     }
-  } catch (string err) {
-    cout << err << endl;
+    if (exit) {
+      break;
+    }
+
+    cout << endl;
+    apply_move(board, decoded_move);
+    is_white = !is_white;
   }
 
+  cout << "\nBye." << endl;
   return 0;
 }
