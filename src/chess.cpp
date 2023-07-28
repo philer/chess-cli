@@ -495,8 +495,8 @@ const map<Piece, array<string, 2>> UTF8_PIECES{
     {pawn, {"♟︎", "♙"}},
 };
 
-const uint8_t forward8[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-const uint8_t reverse8[8] = {7, 6, 5, 4, 3, 2, 1, 0};
+const uint8_t FORWARD_8[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+const uint8_t REVERSE_8[8] = {7, 6, 5, 4, 3, 2, 1, 0};
 
 const uint8_t BOARD_HEADER_HEIGHT = 2;
 const uint8_t BOARD_CONTENT_HEIGHT = 8;
@@ -513,10 +513,10 @@ array<string, BOARD_HEIGHT> board_to_lines(
   lines[10] = color ? "  a b c d e f g h   " : "  h g f e d c b a   ";
 
   Color square_color = black;
-  for (const uint8_t rank : color ? reverse8 : forward8) {
+  for (const uint8_t rank : color ? REVERSE_8 : FORWARD_8) {
     const uint8_t line = (color ? 7 - rank : rank) + BOARD_HEADER_HEIGHT;
     lines[line] = to_string(rank + 1) + " ";
-    for (const uint8_t file : color ? forward8 : reverse8) {
+    for (const uint8_t file : color ? FORWARD_8 : REVERSE_8) {
       optional<ColorPiece> piece = board[file][rank];
       string piece_character;
       if (piece) {
