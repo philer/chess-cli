@@ -59,7 +59,7 @@ bool operator==(const ColorPiece &a, const ColorPiece &b) {
 
 typedef optional<ColorPiece> Board[8][8];
 
-void init_board(Board board) {
+void init_board(Board &board) {
   // empty squares
   for (uint8_t rank = 2; rank < 6; ++rank) {
     for (uint8_t file = 0; file < 8; ++file) {
@@ -129,32 +129,34 @@ const Square get_square(const char file, const char rank) {
       static_cast<uint8_t>((file - 'a')), static_cast<uint8_t>((rank - '1'))};
 }
 
-const string to_string(Square square) {
+const string to_string(const Square &square) {
   return {
       static_cast<char>((square.file + 'a')),
       static_cast<char>((square.rank + '1'))};
 }
 
-const bool exists(Square square) {
+const bool exists(const Square &square) {
   return 0 <= square.file && square.file <= 7 && 0 <= square.rank
          && square.rank <= 7;
 }
 
-const optional<ColorPiece> find_piece(const Board board, const Square square) {
+const optional<ColorPiece> find_piece(
+    const Board &board, const Square &square
+) {
   return board[square.file][square.rank];
 }
 
 const bool has_piece(
-    const Board board, const Square square, const ColorPiece piece
+    const Board &board, const Square &square, const ColorPiece &piece
 ) {
   return board[square.file][square.rank] == piece;
 }
 
 template <size_t N>
 const vector<Square> find_line_moving_pieces(
-    const Board board,
-    const Square target_square,
-    const ColorPiece piece,
+    const Board &board,
+    const Square &target_square,
+    const ColorPiece &piece,
     const array<tuple<int8_t, int8_t>, N> directions
 ) {
   vector<Square> found;
@@ -179,7 +181,7 @@ const vector<Square> find_line_moving_pieces(
 }
 
 const vector<Square> find_bishops(
-    const Board board, const Square target_square, const ColorPiece piece
+    const Board &board, const Square &target_square, const ColorPiece &piece
 ) {
   return find_line_moving_pieces<4>(
       board, target_square, piece, {{{-1, -1}, {+1, -1}, {-1, +1}, {+1, +1}}}
@@ -187,7 +189,7 @@ const vector<Square> find_bishops(
 }
 
 const vector<Square> find_rooks(
-    const Board board, const Square target_square, const ColorPiece piece
+    const Board &board, const Square &target_square, const ColorPiece &piece
 ) {
   return find_line_moving_pieces<4>(
       board, target_square, piece, {{{0, -1}, {0, +1}, {-1, 0}, {+1, 0}}}
@@ -195,7 +197,7 @@ const vector<Square> find_rooks(
 }
 
 const vector<Square> find_queens(
-    const Board board, const Square target_square, const ColorPiece piece
+    const Board &board, const Square &target_square, const ColorPiece &piece
 ) {
   return find_line_moving_pieces<8>(
       board,
@@ -213,9 +215,9 @@ const vector<Square> find_queens(
 }
 
 const vector<Square> find_direct_moving_pieces(
-    const Board board,
-    const Square target_square,
-    const ColorPiece piece,
+    const Board &board,
+    const Square &target_square,
+    const ColorPiece &piece,
     const array<tuple<int8_t, int8_t>, 8> moves
 ) {
   vector<Square> found;
@@ -231,7 +233,7 @@ const vector<Square> find_direct_moving_pieces(
 }
 
 const vector<Square> find_kings(
-    const Board board, const Square target_square, const ColorPiece piece
+    const Board &board, const Square &target_square, const ColorPiece &piece
 ) {
   return find_direct_moving_pieces(
       board,
@@ -249,7 +251,7 @@ const vector<Square> find_kings(
 }
 
 const vector<Square> find_knights(
-    const Board board, const Square target_square, const ColorPiece piece
+    const Board &board, const Square &target_square, const ColorPiece &piece
 ) {
   return find_direct_moving_pieces(
       board,
@@ -267,7 +269,7 @@ const vector<Square> find_knights(
 }
 
 const vector<Square> find_pieces(
-    const Board board, const Square target_square, const ColorPiece piece
+    const Board &board, const Square &target_square, const ColorPiece &piece
 ) {
   switch (piece.piece) {
     case knight:
@@ -314,7 +316,7 @@ const regex FILE_PIECE_CAPTURE_PATTERN{"^[NBRQK][a-h]x[a-h][1-8]$"};
 const regex RANK_PIECE_CAPTURE_PATTERN{"^[NBRQK][1-8]x[a-h][1-8]$"};
 const regex SQUARE_PIECE_CAPTURE_PATTERN{"^[NBRQK][a-h][1-8]x[a-h][1-8]$"};
 
-Move decode_move(const Board board, const string move, const Color color) {
+Move decode_move(const Board &board, const string &move, const Color color) {
   Move mv;
   mv.algebraic = move;
   mv.check = false;
@@ -466,7 +468,7 @@ Move decode_move(const Board board, const string move, const Color color) {
   return mv;
 }
 
-void apply_move(Board board, const Move move) {
+void apply_move(Board &board, const Move &move) {
   if (move.castle_long) {
     // TODO
   } else if (move.castle_int8_t) {
@@ -502,7 +504,7 @@ const uint8_t BOARD_HEIGHT =
     BOARD_HEADER_HEIGHT + BOARD_CONTENT_HEIGHT + BOARD_FOOTER_HEIGHT;
 
 array<string, BOARD_HEIGHT> board_to_lines(
-    const Board board, const Color color = white
+    const Board &board, const Color color = white
 ) {
   array<string, BOARD_HEIGHT> lines;
   lines[0] = color ? "       WHITE        " : "       BLACK        ";
@@ -538,11 +540,9 @@ array<string, BOARD_HEIGHT> board_to_lines(
   return lines;
 }
 
-string concat(string a, string b) { return a + b; }
-
 template <size_t size>
 array<string, size> concat_lines(
-    const array<string, size> a, const array<string, size> b
+    const array<string, size> &a, const array<string, size> &b
 ) {
   array<string, size> result = {};
   for (int i = 0; i < size; ++i) {
@@ -551,7 +551,7 @@ array<string, size> concat_lines(
   return result;
 }
 
-template <size_t size> string join_lines(const array<string, size> lines) {
+template <size_t size> string join_lines(const array<string, size> &lines) {
   string result = "";
   for (string line : lines) {
     result += line + "\n";
@@ -559,7 +559,7 @@ template <size_t size> string join_lines(const array<string, size> lines) {
   return result;
 }
 
-void print_board(const Board board) {
+void print_board(const Board &board) {
   array<string, BOARD_HEIGHT> gap;
   fill(gap.begin(), gap.end(), "   ");
   cout << join_lines(concat_lines(
