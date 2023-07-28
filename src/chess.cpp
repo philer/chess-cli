@@ -158,7 +158,7 @@ vector<Square> find_line_moving_pieces(
     const Board &board,
     const Square &target_square,
     const ColorPiece &piece,
-    const array<tuple<int8_t, int8_t>, N> directions
+    const array<tuple<int8_t, int8_t>, N> &directions
 ) {
   vector<Square> found;
   for (const auto [d_file, d_rank] : directions) {
@@ -219,7 +219,7 @@ vector<Square> find_direct_moving_pieces(
     const Board &board,
     const Square &target_square,
     const ColorPiece &piece,
-    const array<tuple<int8_t, int8_t>, 8> moves
+    const array<tuple<int8_t, int8_t>, 8> &moves
 ) {
   vector<Square> found;
   for (const auto [d_file, d_rank] : moves) {
