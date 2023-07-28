@@ -514,13 +514,13 @@ array<string, BOARD_HEIGHT> board_to_lines(
     const uint8_t line = (color ? 7 - rank : rank) + BOARD_HEADER_HEIGHT;
     lines[line] = to_string(rank + 1) + " ";
     for (const uint8_t file : color ? forward8 : reverse8) {
+      optional<ColorPiece> piece = board[file][rank];
       string piece_character;
-      if (board[file][rank] != nullopt) {
-        ColorPiece piece = *board[file][rank];
+      if (piece) {
         if (square_color == black) {
-          piece.color = static_cast<Color>(!piece.color);
+          piece->color = static_cast<Color>(!piece->color);
         }
-        piece_character = UTF8_PIECES.at(piece.piece)[color];
+        piece_character = UTF8_PIECES.at(piece->piece)[piece->color];
       } else {
         piece_character = " ";
       }
