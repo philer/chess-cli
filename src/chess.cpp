@@ -41,7 +41,9 @@ enum Piece : ushort {
   white_king = white | black_king,
 };
 
-const bool is_white(Piece piece) { return piece & 1; }
+const Color get_color(Piece piece) {
+  return static_cast<Color>(piece & static_cast<ushort>(white));
+}
 
 typedef optional<Piece> Board[8][8];
 
@@ -120,6 +122,11 @@ const string to_string(Square square) {
           static_cast<char>((square.rank + '1'))};
 }
 
+const bool exists(Square square) {
+  return 0 <= square.file && square.file <= 7 && 0 <= square.rank &&
+         square.rank <= 7;
+}
+
 const optional<Piece> find_piece(const Board board, const Square square) {
   return board[square.file][square.rank];
 }
@@ -127,6 +134,116 @@ const optional<Piece> find_piece(const Board board, const Square square) {
 const bool has_piece(const Board board, const Square square,
                      const Piece piece) {
   return board[square.file][square.rank] == piece;
+}
+
+template <size_t N>
+const vector<Square>
+find_line_moving_pieces(const Board board, const Square target_square,
+                        const Piece piece,
+                        const array<tuple<short, short>, N> directions) {
+  vector<Square> found;
+  for (const auto [d_file, d_rank] : directions) {
+    for (ushort offset = 1;; ++offset) {
+      Square square = {
+          static_cast<ushort>(target_square.file + offset * d_file),
+          static_cast<ushort>(target_square.rank + offset * d_rank)};
+      if (!exists(square)) {
+        break;
+      }
+      const optional<Piece> found_piece = find_piece(board, square);
+      if (found_piece) {
+        if (found_piece == piece) {
+          found.push_back(square);
+        }
+        break;
+      }
+    }
+  }
+  return found;
+}
+
+const vector<Square> find_bishops(const Board board, const Square target_square,
+                                  const Piece piece) {
+  return find_line_moving_pieces<4>(board, target_square, piece,
+                                    {{{-1, -1}, {+1, -1}, {-1, +1}, {+1, +1}}});
+}
+
+const vector<Square> find_rooks(const Board board, const Square target_square,
+                                const Piece piece) {
+  return find_line_moving_pieces<4>(board, target_square, piece,
+                                    {{{0, -1}, {0, +1}, {-1, 0}, {+1, 0}}});
+}
+
+const vector<Square> find_queens(const Board board, const Square target_square,
+                                 const Piece piece) {
+  return find_line_moving_pieces<8>(board, target_square, piece,
+                                    {{{-1, -1},
+                                      {+1, -1},
+                                      {-1, +1},
+                                      {+1, +1},
+                                      {0, -1},
+                                      {0, +1},
+                                      {-1, 0},
+                                      {+1, 0}}});
+}
+
+const vector<Square>
+find_direct_moving_pieces(const Board board, const Square target_square,
+                          const Piece piece,
+                          const array<tuple<short, short>, 8> moves) {
+  vector<Square> found;
+  for (const auto [d_file, d_rank] : moves) {
+    Square square = {static_cast<ushort>(target_square.file + d_file),
+                     static_cast<ushort>(target_square.rank + d_rank)};
+    if (exists(square) && find_piece(board, square) == piece) {
+      found.push_back(square);
+    }
+  }
+  return found;
+}
+
+const vector<Square> find_kings(const Board board, const Square target_square,
+                                const Piece piece) {
+  return find_direct_moving_pieces(board, target_square, piece,
+                                   {{{-1, -1},
+                                     {+1, -1},
+                                     {-1, +1},
+                                     {+1, +1},
+                                     {0, -1},
+                                     {0, +1},
+                                     {-1, 0},
+                                     {+1, 0}}});
+}
+
+const vector<Square> find_knights(const Board board, const Square target_square,
+                                  const Piece piece) {
+  return find_direct_moving_pieces(board, target_square, piece,
+                                   {{{+1, +2},
+                                     {+1, -2},
+                                     {-1, +2},
+                                     {-1, -2},
+                                     {+2, +1},
+                                     {+2, -1},
+                                     {-2, +1},
+                                     {-2, -1}}});
+}
+
+const vector<Square> find_pieces(const Board board, const Square target_square,
+                                 const Piece piece) {
+  switch (piece & ~white) {
+  case black_knight:
+    return find_knights(board, target_square, piece);
+  case black_bishop:
+    return find_bishops(board, target_square, piece);
+  case black_rook:
+    return find_rooks(board, target_square, piece);
+  case black_queen:
+    return find_queens(board, target_square, piece);
+  case black_king:
+    return find_kings(board, target_square, piece);
+  default:
+    throw string("Something went wrong!");
+  }
 }
 
 struct Move {
@@ -212,7 +329,7 @@ Move decode_move(const Board board, const string move, const Color color) {
     if (!mv.capture) {
       throw string("There is nothing to capture on " + to_string(mv.to) + ".");
     }
-    if (color == is_white(mv.capture.value())) {
+    if (color == get_color(mv.capture.value())) {
       throw string("Can't capture your own piece.");
     }
 
@@ -231,12 +348,42 @@ Move decode_move(const Board board, const string move, const Color color) {
   } else if (regex_match(move, PIECE_MOVE_PATTERN)) { // "Qe4"
     mv.piece = get_piece(move[0], color);
     mv.to = get_square(move[1], move[2]);
-    // TODO
+    const vector<Square> candidates = find_pieces(board, mv.to, mv.piece);
+    switch (candidates.size()) {
+    case 1:
+      mv.from = candidates[0];
+      break;
+    case 0:
+      throw string("No candidate pieces available.");
+    default:
+      throw string("Ambiguous move: multiple pieces available.");
+    }
+    mv.capture = find_piece(board, mv.to);
+    if (mv.capture) {
+      throw string("Target square is occupied") +
+          (color == get_color(mv.capture.value()) ? " by your own piece."
+                                                  : ", add 'x' to capture.");
+    }
 
   } else if (regex_match(move, FILE_PIECE_MOVE_PATTERN)) { // "Qde4"
     mv.piece = get_piece(move[0], color);
-    mv.to = get_square(move[2], move[3]);
-    // TODO
+    mv.to = get_square(move[1], move[2]);
+    const vector<Square> candidates = find_pieces(board, mv.to, mv.piece);
+    switch (candidates.size()) {
+    case 1:
+      mv.from = candidates[0];
+      break;
+    case 0:
+      throw string("No candidate pieces available.");
+    default:
+      throw string("Ambiguous move: multiple pieces available.");
+    }
+    mv.capture = find_piece(board, mv.to);
+    if (!mv.capture) {
+      throw string("Nothing to capture on " + to_string(mv.to));
+    } else if (color == get_color(mv.capture.value())) {
+      throw string("Can't capture your own piece.");
+    }
 
   } else if (regex_match(move, RANK_PIECE_MOVE_PATTERN)) { // "Q3e4"
     mv.piece = get_piece(move[0], color);
@@ -377,9 +524,9 @@ template <size_t size> string join_lines(const array<string, size> lines) {
 void print_board(const Board board) {
   array<string, BOARD_HEIGHT> gap;
   fill(gap.begin(), gap.end(), "   ");
-  cout << join_lines(concat_lines<BOARD_HEIGHT>(
-      concat_lines<BOARD_HEIGHT>(board_to_lines(board), gap),
-      board_to_lines(board, black)));
+  cout << join_lines(
+      concat_lines(concat_lines<BOARD_HEIGHT>(board_to_lines(board), gap),
+                   board_to_lines(board, black)));
 }
 
 int main() {
