@@ -21,6 +21,11 @@ using namespace std;
  * + highlight available moves for a selected piece
  * */
 
+enum Color : bool {
+  black = false,
+  white = true,
+};
+
 enum Piece : ushort {
   black_pawn = 0 << 1,
   black_knight = 1 << 1,
@@ -28,12 +33,12 @@ enum Piece : ushort {
   black_rook = 3 << 1,
   black_queen = 4 << 1,
   black_king = 5 << 1,
-  white_pawn = 1 | black_pawn,
-  white_knight = 1 | black_knight,
-  white_bishop = 1 | black_bishop,
-  white_rook = 1 | black_rook,
-  white_queen = 1 | black_queen,
-  white_king = 1 | black_king,
+  white_pawn = white | black_pawn,
+  white_knight = white | black_knight,
+  white_bishop = white | black_bishop,
+  white_rook = white | black_rook,
+  white_queen = white | black_queen,
+  white_king = white | black_king,
 };
 
 const bool is_white(Piece piece) { return piece & 1; }
@@ -79,20 +84,20 @@ void init_board(Board board) {
 // Ambiguous case: "bc6" could be a bishop or a pawn capture
 static const string PIECE_CHARS = "NBRQK";
 
-Piece get_piece(const char piece_character, const bool as_white) {
+Piece get_piece(const char piece_character, const Color color) {
   switch (piece_character) {
   case 'K':
-    return as_white ? Piece::white_king : Piece::black_king;
+    return color ? Piece::white_king : Piece::black_king;
   case 'Q':
-    return as_white ? Piece::white_queen : Piece::black_queen;
+    return color ? Piece::white_queen : Piece::black_queen;
   case 'R':
-    return as_white ? Piece::white_rook : Piece::black_rook;
+    return color ? Piece::white_rook : Piece::black_rook;
   case 'B':
-    return as_white ? Piece::white_bishop : Piece::black_bishop;
+    return color ? Piece::white_bishop : Piece::black_bishop;
   case 'N':
-    return as_white ? Piece::white_knight : Piece::black_knight;
+    return color ? Piece::white_knight : Piece::black_knight;
   case 'P':
-    return as_white ? Piece::white_pawn : Piece::black_pawn;
+    return color ? Piece::white_pawn : Piece::black_pawn;
   default:
     string piece_str;
     piece_str = piece_character;
@@ -153,14 +158,14 @@ const regex FILE_PIECE_CAPTURE_PATTERN{"[NBRQK][a-h]x[a-h][1-8]"};
 const regex RANK_PIECE_CAPTURE_PATTERN{"[NBRQK][1-8]x[a-h][1-8]"};
 const regex SQUARE_PIECE_CAPTURE_PATTERN{"[NBRQK][a-h][1-8]x[a-h][1-8]"};
 
-Move decode_move(const Board board, const string move, const bool as_white) {
+Move decode_move(const Board board, const string move, const Color color) {
   Move mv;
   mv.algebraic = move;
   mv.check = false;
   mv.castle_long = false;
   mv.castle_short = false;
 
-  const short forwards = as_white ? 1 : -1;
+  const short forwards = color ? 1 : -1;
 
   if (move == "0-0" || move == "O-O") {
     // TODO check castling rights
@@ -171,13 +176,13 @@ Move decode_move(const Board board, const string move, const bool as_white) {
     mv.castle_long = true;
 
   } else if (regex_match(move, PAWN_MOVE_PATTERN)) { // "e4"
-    mv.piece = get_piece('P', as_white);
+    mv.piece = get_piece('P', color);
     mv.to = get_square(move[0], move[1]);
     mv.from.file = mv.to.file;
 
     if (board[mv.from.file][mv.to.rank - forwards] == mv.piece) {
       mv.from.rank = mv.to.rank - forwards;
-    } else if ((as_white && mv.to.rank == 3 || !as_white && mv.to.rank == 4) &&
+    } else if ((color && mv.to.rank == 3 || !color && mv.to.rank == 4) &&
                !board[mv.from.file][mv.to.rank - forwards] &&
                board[mv.from.file][mv.to.rank - 2 * forwards] == mv.piece) {
       mv.from.rank = mv.to.rank - 2 * forwards;
@@ -193,7 +198,7 @@ Move decode_move(const Board board, const string move, const bool as_white) {
     }
 
   } else if (regex_match(move, PAWN_CAPTURE_PATTERN)) { // "dxe4"
-    mv.piece = get_piece('P', as_white);
+    mv.piece = get_piece('P', color);
     mv.to = get_square(move[2], move[3]);
     mv.from = get_square(move[0], move[3] - forwards);
     if (abs(mv.from.file - mv.to.file) != 1) {
@@ -207,59 +212,59 @@ Move decode_move(const Board board, const string move, const bool as_white) {
     if (!mv.capture) {
       throw string("There is nothing to capture on " + to_string(mv.to) + ".");
     }
-    if (as_white == is_white(mv.capture.value())) {
+    if (color == is_white(mv.capture.value())) {
       throw string("Can't capture your own piece.");
     }
 
   } else if (regex_match(move, PAWN_PROMOTION_PATTERN)) { // "e8Q"
-    mv.piece = get_piece('P', as_white);
+    mv.piece = get_piece('P', color);
     mv.to = get_square(move[0], move[1]);
-    mv.promotion = get_piece(move[2], as_white);
+    mv.promotion = get_piece(move[2], color);
     // TODO
 
   } else if (regex_match(move, PAWN_CAPTURE_PROMOTION_PATTERN)) { // "dxe8Q"
-    mv.piece = get_piece('P', as_white);
+    mv.piece = get_piece('P', color);
     mv.to = get_square(move[2], move[3]);
-    mv.promotion = get_piece(move[4], as_white);
+    mv.promotion = get_piece(move[4], color);
     // TODO
 
   } else if (regex_match(move, PIECE_MOVE_PATTERN)) { // "Qe4"
-    mv.piece = get_piece(move[0], as_white);
+    mv.piece = get_piece(move[0], color);
     mv.to = get_square(move[1], move[2]);
     // TODO
 
   } else if (regex_match(move, FILE_PIECE_MOVE_PATTERN)) { // "Qde4"
-    mv.piece = get_piece(move[0], as_white);
+    mv.piece = get_piece(move[0], color);
     mv.to = get_square(move[2], move[3]);
     // TODO
 
   } else if (regex_match(move, RANK_PIECE_MOVE_PATTERN)) { // "Q3e4"
-    mv.piece = get_piece(move[0], as_white);
+    mv.piece = get_piece(move[0], color);
     mv.to = get_square(move[2], move[3]);
     // TODO
 
   } else if (regex_match(move, SQUARE_PIECE_MOVE_PATTERN)) { // "Qd3e4"
-    mv.piece = get_piece(move[0], as_white);
+    mv.piece = get_piece(move[0], color);
     mv.to = get_square(move[3], move[4]);
     // TODO
 
   } else if (regex_match(move, PIECE_CAPTURE_PATTERN)) { // "Qxe4"
-    mv.piece = get_piece(move[0], as_white);
+    mv.piece = get_piece(move[0], color);
     mv.to = get_square(move[2], move[3]);
     // TODO
 
   } else if (regex_match(move, FILE_PIECE_CAPTURE_PATTERN)) { // "Qdxe4"
-    mv.piece = get_piece(move[0], as_white);
+    mv.piece = get_piece(move[0], color);
     mv.to = get_square(move[3], move[4]);
     // TODO
 
   } else if (regex_match(move, RANK_PIECE_CAPTURE_PATTERN)) { // "Q3xe4"
-    mv.piece = get_piece(move[0], as_white);
+    mv.piece = get_piece(move[0], color);
     mv.to = get_square(move[3], move[4]);
     // TODO
 
   } else if (regex_match(move, SQUARE_PIECE_CAPTURE_PATTERN)) { // "Qd3xe4"
-    mv.piece = get_piece(move[0], as_white);
+    mv.piece = get_piece(move[0], color);
     mv.to = get_square(move[4], move[5]);
     // TODO
 
@@ -314,35 +319,35 @@ const ushort BOARD_HEIGHT =
     BOARD_HEADER_HEIGHT + BOARD_CONTENT_HEIGHT + BOARD_FOOTER_HEIGHT;
 
 array<string, BOARD_HEIGHT> board_to_lines(const Board board,
-                                           const bool as_white = true) {
+                                           const Color color = white) {
   array<string, BOARD_HEIGHT> lines;
-  lines[0] = as_white ? "       WHITE        " : "       BLACK        ";
-  lines[1] = as_white ? "  a b c d e f g h   " : "  h g f e d c b a   ";
-  lines[10] = as_white ? "  a b c d e f g h   " : "  h g f e d c b a   ";
+  lines[0] = color ? "       WHITE        " : "       BLACK        ";
+  lines[1] = color ? "  a b c d e f g h   " : "  h g f e d c b a   ";
+  lines[10] = color ? "  a b c d e f g h   " : "  h g f e d c b a   ";
 
-  bool black_square = true;
-  for (const ushort rank : as_white ? reverse8 : forward8) {
-    const ushort line = (as_white ? 7 - rank : rank) + BOARD_HEADER_HEIGHT;
+  Color square_color = black;
+  for (const ushort rank : color ? reverse8 : forward8) {
+    const ushort line = (color ? 7 - rank : rank) + BOARD_HEADER_HEIGHT;
     lines[line] = to_string(rank + 1) + " ";
-    for (const ushort file : as_white ? forward8 : reverse8) {
+    for (const ushort file : color ? forward8 : reverse8) {
       string piece_character;
       if (board[file][rank] != nullopt) {
         Piece piece = board[file][rank].value();
-        if (black_square) {
+        if (square_color == black) {
           piece = inverted_pieces[piece];
         }
         piece_character = pieces[piece];
       } else {
         piece_character = " ";
       }
-      if (black_square) {
+      if (square_color == black) {
         lines[line] += piece_character + " ";
       } else {
         lines[line] += ANSI_INVERT + piece_character + " " + ANSI_RESET;
       }
-      black_square = !black_square;
+      square_color = static_cast<Color>(!square_color);
     }
-    black_square = !black_square;
+    square_color = static_cast<Color>(!square_color);
     lines[line] += " " + to_string(rank + 1);
   }
 
@@ -374,7 +379,7 @@ void print_board(const Board board) {
   fill(gap.begin(), gap.end(), "   ");
   cout << join_lines(concat_lines<BOARD_HEIGHT>(
       concat_lines<BOARD_HEIGHT>(board_to_lines(board), gap),
-      board_to_lines(board, false)));
+      board_to_lines(board, black)));
 }
 
 int main() {
@@ -382,14 +387,14 @@ int main() {
   init_board(board);
 
   vector<string> game = {"d4", "d5", "e3", "c6"};
-  bool is_white = true;
+  Color color = white;
   uint move_no = 0;
   string move;
   Move decoded_move;
 
   bool exit = false;
   while (true) {
-    if (is_white) {
+    if (color) {
       move_no += 1;
       cout << "                { Move " << move_no << " }" << endl;
     }
@@ -402,12 +407,12 @@ int main() {
           exit = true;
           break;
         }
-        cout << (is_white ? "White> " : "Black> ");
+        cout << (color ? "White> " : "Black> ");
         cin >> move;
         if (move == "exit" || move == "quit" || move == "q" || move == "") {
           exit = true;
         } else {
-          decoded_move = decode_move(board, move, is_white);
+          decoded_move = decode_move(board, move, color);
         }
         break;
       } catch (string err) {
@@ -420,7 +425,7 @@ int main() {
 
     cout << endl;
     apply_move(board, decoded_move);
-    is_white = !is_white;
+    color = static_cast<Color>(!color);
   }
 
   cout << "\nBye." << endl;
