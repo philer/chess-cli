@@ -275,12 +275,27 @@ struct Move {
 };
 
 // TODO shortened pawn captures ("exd", "ed")
-const regex PAWN_MOVE_PATTERN{"^[a-h][1-8]$"};
-const regex PAWN_CAPTURE_PATTERN{"^[a-h]x[a-h][1-8]$"};
-const regex PAWN_PROMOTION_PATTERN{"^[a-h][1-8][NBRQ]$"};
-const regex PAWN_CAPTURE_PROMOTION_PATTERN{"^[a-h]x[a-h][1-8][NBRQ]$"};
-
+const regex PAWN_MOVE_PATTERN{"^[a-h][1-8][NBRQ]?$"};
+const regex PAWN_CAPTURE_PATTERN{"^[a-h]x[a-h][1-8][NBRQ]?$"};
 const regex PIECE_MOVE_OR_CAPTURE_PATTERN{"^[NBRQK][a-h]?[1-8]?x?[a-h][1-8]$"};
+
+optional<ColorPiece> get_promotion(
+    const Board $board, const Move &move, const Color color
+) {
+  optional<ColorPiece> promotion = nullopt;
+  if (string("NBRQ").find(move.algebraic.back()) != string::npos) {
+    // could use try-catch instead
+    promotion = get_piece(move.algebraic.back(), color);
+  }
+  const bool must_promote = color == white && move.to.rank == 7
+                            || color == black && move.to.rank == 0;
+  if (must_promote && !promotion) {
+    throw string("The pawn reaches the final rank and must be promoted.");
+  } else if (!must_promote && promotion) {
+    throw string("Can only promote on the final rank.");
+  }
+  return promotion;
+}
 
 Move decode_move(const Board &board, const string &move, const Color color) {
   Move mv;
@@ -290,6 +305,7 @@ Move decode_move(const Board &board, const string &move, const Color color) {
   mv.castle_int8_t = false;
 
   const int8_t forwards = color ? 1 : -1;
+  const uint8_t len = move.size();
 
   if (move == "0-0" || move == "O-O") {
     // TODO check castling rights
@@ -306,9 +322,11 @@ Move decode_move(const Board &board, const string &move, const Color color) {
 
     if (board[mv.from.file][mv.to.rank - forwards] == mv.piece) {
       mv.from.rank = mv.to.rank - forwards;
+
     } else if ((color && mv.to.rank == 3 || !color && mv.to.rank == 4) &&
                !board[mv.from.file][mv.to.rank - forwards] &&
                board[mv.from.file][mv.to.rank - 2 * forwards] == mv.piece) {
+      // Move two spaces from starting rank
       mv.from.rank = mv.to.rank - 2 * forwards;
     } else {
       throw string(
@@ -321,6 +339,15 @@ Move decode_move(const Board &board, const string &move, const Color color) {
           + "."
       );
     }
+
+    // Prevent illegal capture
+    if (find_piece(board, mv.to)) {
+      throw string(
+          to_string(mv.to) + " is blocked. Pawns can only capture diagonally."
+      );
+    }
+
+    mv.promotion = get_promotion(board, mv, color);
 
   } else if (regex_match(move, PAWN_CAPTURE_PATTERN)) {  // "dxe4"
     mv.piece = get_piece('P', color);
@@ -341,22 +368,11 @@ Move decode_move(const Board &board, const string &move, const Color color) {
       throw string("Can't capture your own piece.");
     }
 
-  } else if (regex_match(move, PAWN_PROMOTION_PATTERN)) {  // "e8Q"
-    mv.piece = get_piece('P', color);
-    mv.to = get_square(move[0], move[1]);
-    mv.promotion = get_piece(move[2], color);
-    throw string("NOT IMPLEMENTED");  // TODO
-
-  } else if (regex_match(move, PAWN_CAPTURE_PROMOTION_PATTERN)) {  // "dxe8Q"
-    mv.piece = get_piece('P', color);
-    mv.to = get_square(move[2], move[3]);
-    mv.promotion = get_piece(move[4], color);
-    throw string("NOT IMPLEMENTED");  // TODO
+    mv.promotion = get_promotion(board, mv, color);
 
   } else if (regex_match(move, PIECE_MOVE_OR_CAPTURE_PATTERN)) {
     // "Qe4, Qxe4, Qde4, Qdxe4, Q3e4, Q3xe4, Qd3e4, Qd3xe4"
 
-    const uint8_t len = move.size();
     mv.piece = get_piece(move[0], color);
     mv.to = get_square(move[len - 2], move[len - 1]);
 
@@ -389,7 +405,9 @@ Move decode_move(const Board &board, const string &move, const Color color) {
     mv.capture = find_piece(board, mv.to);
     if (move[len - 3] == 'x') {
       if (!mv.capture) {
-        throw string("Nothing to capture on " + to_string(mv.to) + ".");
+        throw string(
+            "There is nothing to capture on " + to_string(mv.to) + "."
+        );
       } else if (color == mv.capture->color) {
         throw string("Can't capture your own piece.");
       }
