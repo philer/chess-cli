@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.10)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS YES)
+
 project(LearnCPP VERSION 1.0)
+
+# set(CMAKE_C_COMPILER "clang")
+# set(CMAKE_CXX_COMPILER "clang++")
+# set(CMAKE_CXX_EXTENSIONS OFF)  # gnu++ -> c++
+# add_definitions("-fexperimental-library")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
