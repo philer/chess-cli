@@ -173,12 +173,11 @@ vector<Square> find_line_moving_pieces(
         break;
       }
       const optional<ColorPiece> found_piece = find_piece(board, square);
-      const bool is_qualified =
-          (!file || square.file == *file) && (!rank || square.rank == *rank);
-      if (is_qualified && found_piece && found_piece == piece) {
+      if (found_piece && found_piece == piece && (!file || square.file == file)
+          && (!rank || square.rank == rank)) {
         found.push_back(square);
       }
-      if (is_qualified || found_piece) {
+      if (found_piece) {
         break;
       }
     }
