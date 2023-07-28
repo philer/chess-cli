@@ -1,4 +1,5 @@
 #include <array>
+#include <cstdint>
 #include <iostream>
 #include <map>
 #include <optional>
@@ -158,7 +159,9 @@ vector<Square> find_line_moving_pieces(
     const Board &board,
     const Square &target_square,
     const ColorPiece &piece,
-    const array<tuple<int8_t, int8_t>, N> &directions
+    const array<tuple<int8_t, int8_t>, N> &directions,
+    optional<uint8_t> file = nullopt,
+    optional<uint8_t> rank = nullopt
 ) {
   vector<Square> found;
   for (const auto [d_file, d_rank] : directions) {
@@ -170,10 +173,12 @@ vector<Square> find_line_moving_pieces(
         break;
       }
       const optional<ColorPiece> found_piece = find_piece(board, square);
-      if (found_piece) {
-        if (found_piece == piece) {
-          found.push_back(square);
-        }
+      const bool is_qualified =
+          (!file || square.file == *file) && (!rank || square.rank == *rank);
+      if (is_qualified && found_piece && found_piece == piece) {
+        found.push_back(square);
+      }
+      if (is_qualified || found_piece) {
         break;
       }
     }
@@ -181,108 +186,76 @@ vector<Square> find_line_moving_pieces(
   return found;
 }
 
-vector<Square> find_bishops(
-    const Board &board, const Square &target_square, const ColorPiece &piece
-) {
-  return find_line_moving_pieces<4>(
-      board, target_square, piece, {{{-1, -1}, {+1, -1}, {-1, +1}, {+1, +1}}}
-  );
-}
-
-vector<Square> find_rooks(
-    const Board &board, const Square &target_square, const ColorPiece &piece
-) {
-  return find_line_moving_pieces<4>(
-      board, target_square, piece, {{{0, -1}, {0, +1}, {-1, 0}, {+1, 0}}}
-  );
-}
-
-vector<Square> find_queens(
-    const Board &board, const Square &target_square, const ColorPiece &piece
-) {
-  return find_line_moving_pieces<8>(
-      board,
-      target_square,
-      piece,
-      {{{-1, -1},
-        {+1, -1},
-        {-1, +1},
-        {+1, +1},
-        {0, -1},
-        {0, +1},
-        {-1, 0},
-        {+1, 0}}}
-  );
-}
 
 vector<Square> find_direct_moving_pieces(
     const Board &board,
     const Square &target_square,
     const ColorPiece &piece,
-    const array<tuple<int8_t, int8_t>, 8> &moves
+    const array<tuple<int8_t, int8_t>, 8> &moves,
+    optional<uint8_t> file = nullopt,
+    optional<uint8_t> rank = nullopt
 ) {
   vector<Square> found;
   for (const auto [d_file, d_rank] : moves) {
     Square square = {
         static_cast<uint8_t>(target_square.file + d_file),
         static_cast<uint8_t>(target_square.rank + d_rank)};
-    if (exists(square) && find_piece(board, square) == piece) {
+    if (!exists(square)) {
+      continue;
+    }
+    if (file && square.file != *file || rank && square.rank != *rank) {
+      continue;
+    }
+    if (find_piece(board, square) == piece) {
       found.push_back(square);
     }
   }
   return found;
 }
 
-vector<Square> find_kings(
-    const Board &board, const Square &target_square, const ColorPiece &piece
-) {
-  return find_direct_moving_pieces(
-      board,
-      target_square,
-      piece,
-      {{{-1, -1},
-        {+1, -1},
-        {-1, +1},
-        {+1, +1},
-        {0, -1},
-        {0, +1},
-        {-1, 0},
-        {+1, 0}}}
-  );
-}
-
-vector<Square> find_knights(
-    const Board &board, const Square &target_square, const ColorPiece &piece
-) {
-  return find_direct_moving_pieces(
-      board,
-      target_square,
-      piece,
-      {{{+1, +2},
-        {+1, -2},
-        {-1, +2},
-        {-1, -2},
-        {+2, +1},
-        {+2, -1},
-        {-2, +1},
-        {-2, -1}}}
-  );
-}
-
 vector<Square> find_pieces(
-    const Board &board, const Square &target_square, const ColorPiece &piece
+    const Board &board,
+    const Square &target_square,
+    const ColorPiece &piece,
+    optional<uint8_t> file = nullopt,
+    optional<uint8_t> rank = nullopt
 ) {
   switch (piece.piece) {
+    // clang-format off
     case knight:
-      return find_knights(board, target_square, piece);
+      return find_direct_moving_pieces(
+          board, target_square, piece,
+          {{{+1, +2}, {+1, -2}, {-1, +2}, {-1, -2},
+            {+2, +1}, {+2, -1}, {-2, +1}, {-2, -1}}},
+          file, rank
+      );
     case bishop:
-      return find_bishops(board, target_square, piece);
+      return find_line_moving_pieces<4>(
+          board, target_square, piece,
+          {{{-1, -1}, {+1, -1}, {-1, +1}, {+1, +1}}},
+          file, rank
+      );
     case rook:
-      return find_rooks(board, target_square, piece);
+      return find_line_moving_pieces<4>(
+          board, target_square, piece,
+          {{{0, -1}, {0, +1}, {-1, 0}, {+1, 0}}},
+          file, rank
+      );
     case queen:
-      return find_queens(board, target_square, piece);
+      return find_line_moving_pieces<8>(
+          board, target_square, piece,
+          {{{-1, -1}, {+1, -1}, {-1, +1}, {+1, +1},
+            { 0, -1}, { 0, +1}, {-1,  0}, {+1,  0}}},
+          file, rank
+      );
     case king:
-      return find_kings(board, target_square, piece);
+      return find_direct_moving_pieces(
+          board, target_square, piece,
+          {{{-1, -1}, {+1, -1}, {-1, +1}, {+1, +1},
+            { 0, -1}, { 0, +1}, {-1,  0}, {+1,  0}}},
+          file, rank
+      );
+    // clang-format on
     default:
       throw string("Something went wrong!");
   }
@@ -301,21 +274,13 @@ struct Move {
   optional<ColorPiece> promotion;
 };
 
-// TODO int8_tened pawn captures ("exd", "ed")
+// TODO shortened pawn captures ("exd", "ed")
 const regex PAWN_MOVE_PATTERN{"^[a-h][1-8]$"};
 const regex PAWN_CAPTURE_PATTERN{"^[a-h]x[a-h][1-8]$"};
 const regex PAWN_PROMOTION_PATTERN{"^[a-h][1-8][NBRQ]$"};
 const regex PAWN_CAPTURE_PROMOTION_PATTERN{"^[a-h]x[a-h][1-8][NBRQ]$"};
 
-const regex PIECE_MOVE_PATTERN{"^[NBRQK][a-h][1-8]$"};
-const regex FILE_PIECE_MOVE_PATTERN{"^[NBRQK][a-h][a-h][1-8]$"};
-const regex RANK_PIECE_MOVE_PATTERN{"^[NBRQK][1-8][a-h][1-8]$"};
-const regex SQUARE_PIECE_MOVE_PATTERN{"^[NBRQK][a-h][1-8][a-h][1-8]$"};
-
-const regex PIECE_CAPTURE_PATTERN{"^[NBRQK]x[a-h][1-8]$"};
-const regex FILE_PIECE_CAPTURE_PATTERN{"^[NBRQK][a-h]x[a-h][1-8]$"};
-const regex RANK_PIECE_CAPTURE_PATTERN{"^[NBRQK][1-8]x[a-h][1-8]$"};
-const regex SQUARE_PIECE_CAPTURE_PATTERN{"^[NBRQK][a-h][1-8]x[a-h][1-8]$"};
+const regex PIECE_MOVE_OR_CAPTURE_PATTERN{"^[NBRQK][a-h]?[1-8]?x?[a-h][1-8]$"};
 
 Move decode_move(const Board &board, const string &move, const Color color) {
   Move mv;
@@ -388,10 +353,28 @@ Move decode_move(const Board &board, const string &move, const Color color) {
     mv.promotion = get_piece(move[4], color);
     throw string("NOT IMPLEMENTED");  // TODO
 
-  } else if (regex_match(move, PIECE_MOVE_PATTERN)) {  // "Qe4"
+  } else if (regex_match(move, PIECE_MOVE_OR_CAPTURE_PATTERN)) {
+    // "Qe4, Qxe4, Qde4, Qdxe4, Q3e4, Q3xe4, Qd3e4, Qd3xe4"
+
+    const uint8_t len = move.size();
     mv.piece = get_piece(move[0], color);
-    mv.to = get_square(move[1], move[2]);
-    const vector<Square> candidates = find_pieces(board, mv.to, mv.piece);
+    mv.to = get_square(move[len - 2], move[len - 1]);
+
+    // Decode optional starting square qualifiers
+    optional<char> from_file = nullopt;
+    optional<char> from_rank = nullopt;
+    for (const char detail : move.substr(1, len - 3)) {
+      if (string("abcdefgh").find(detail) != string::npos) {
+        from_file = detail - 'a';
+      } else if (string("12345678").find(detail) != string::npos) {
+        from_rank = detail - '1';
+        break;
+      }
+    }
+
+    // Search for matching pieces
+    const vector<Square> candidates =
+        find_pieces(board, mv.to, mv.piece, from_file, from_rank);
     switch (candidates.size()) {
       case 1:
         mv.from = candidates[0];
@@ -401,62 +384,22 @@ Move decode_move(const Board &board, const string &move, const Color color) {
       default:
         throw string("Ambiguous move: multiple pieces available.");
     }
+
+    // Check for captures
     mv.capture = find_piece(board, mv.to);
-    if (mv.capture) {
-      throw string("Target square is occupied")
-          + (color == mv.capture.value().color ? " by your own piece."
-                                               : ", add 'x' to capture.");
+    if (move[len - 3] == 'x') {
+      if (!mv.capture) {
+        throw string("Nothing to capture on " + to_string(mv.to) + ".");
+      } else if (color == mv.capture->color) {
+        throw string("Can't capture your own piece.");
+      }
+    } else {
+      if (mv.capture) {
+        throw string("Target square is occupied")
+            + (color == mv.capture->color ? " by your own piece."
+                                          : ", add 'x' to capture.");
+      }
     }
-
-  } else if (regex_match(move, PIECE_CAPTURE_PATTERN)) {  // "Qxe4"
-    mv.piece = get_piece(move[0], color);
-    mv.to = get_square(move[2], move[3]);
-    const vector<Square> candidates = find_pieces(board, mv.to, mv.piece);
-    switch (candidates.size()) {
-      case 1:
-        mv.from = candidates[0];
-        break;
-      case 0:
-        throw string("No candidate pieces available.");
-      default:
-        throw string("Ambiguous move: multiple pieces available.");
-    }
-    mv.capture = find_piece(board, mv.to);
-    if (!mv.capture) {
-      throw string("Nothing to capture on " + to_string(mv.to));
-    } else if (color == mv.capture->color) {
-      throw string("Can't capture your own piece.");
-    }
-
-  } else if (regex_match(move, FILE_PIECE_MOVE_PATTERN)) {  // "Qde4"
-    mv.piece = get_piece(move[0], color);
-    mv.to = get_square(move[2], move[3]);
-    throw string("NOT IMPLEMENTED");  // TODO
-
-  } else if (regex_match(move, FILE_PIECE_CAPTURE_PATTERN)) {  // "Qdxe4"
-    mv.piece = get_piece(move[0], color);
-    mv.to = get_square(move[3], move[4]);
-    throw string("NOT IMPLEMENTED");  // TODO
-
-  } else if (regex_match(move, RANK_PIECE_MOVE_PATTERN)) {  // "Q3e4"
-    mv.piece = get_piece(move[0], color);
-    mv.to = get_square(move[2], move[3]);
-    throw string("NOT IMPLEMENTED");  // TODO
-
-  } else if (regex_match(move, RANK_PIECE_CAPTURE_PATTERN)) {  // "Q3xe4"
-    mv.piece = get_piece(move[0], color);
-    mv.to = get_square(move[3], move[4]);
-    throw string("NOT IMPLEMENTED");  // TODO
-
-  } else if (regex_match(move, SQUARE_PIECE_MOVE_PATTERN)) {  // "Qd3e4"
-    mv.piece = get_piece(move[0], color);
-    mv.to = get_square(move[3], move[4]);
-    throw string("NOT IMPLEMENTED");  // TODO
-
-  } else if (regex_match(move, SQUARE_PIECE_CAPTURE_PATTERN)) {  // "Qd3xe4"
-    mv.piece = get_piece(move[0], color);
-    mv.to = get_square(move[4], move[5]);
-    throw string("NOT IMPLEMENTED");  // TODO
 
   } else {
     throw string(
