@@ -3,6 +3,7 @@
 #include <map>
 #include <optional>
 #include <ranges>
+#include <regex>
 #include <string>
 #include <vector>
 
@@ -20,20 +21,22 @@ using namespace std;
  * + highlight available moves for a selected piece
  * */
 
-enum Piece {
-  white_king,
-  white_queen,
-  white_rook,
-  white_bishop,
-  white_knight,
-  white_pawn,
-  black_king,
-  black_queen,
-  black_rook,
-  black_bishop,
-  black_knight,
-  black_pawn,
+enum Piece : ushort {
+  black_pawn = 0 << 1,
+  black_knight = 1 << 1,
+  black_bishop = 2 << 1,
+  black_rook = 3 << 1,
+  black_queen = 4 << 1,
+  black_king = 5 << 1,
+  white_pawn = 1 | black_pawn,
+  white_knight = 1 | black_knight,
+  white_bishop = 1 | black_bishop,
+  white_rook = 1 | black_rook,
+  white_queen = 1 | black_queen,
+  white_king = 1 | black_king,
 };
+
+const bool is_white(Piece piece) { return piece & 1; }
 
 typedef optional<Piece> Board[8][8];
 
@@ -102,21 +105,23 @@ struct Square {
   ushort rank;
 };
 
-static const string FILE_CHARS = "abcdefgh";
-static const string RANK_CHARS = "12345678";
-
-inline Square get_square(const char file, const char rank) {
-  if (FILE_CHARS.find(file) == string::npos ||
-      RANK_CHARS.find(rank) == string::npos) {
-    throw string("Not a valid square: '") + file + rank + "'";
-  }
+const Square get_square(const char file, const char rank) {
   return Square{static_cast<ushort>((file - 'a')),
                 static_cast<ushort>((rank - '1'))};
 }
 
-inline string to_string(Square square) {
+const string to_string(Square square) {
   return {static_cast<char>((square.file + 'a')),
           static_cast<char>((square.rank + '1'))};
+}
+
+const optional<Piece> find_piece(const Board board, const Square square) {
+  return board[square.file][square.rank];
+}
+
+const bool has_piece(const Board board, const Square square,
+                     const Piece piece) {
+  return board[square.file][square.rank] == piece;
 }
 
 struct Move {
@@ -132,6 +137,22 @@ struct Move {
   optional<Piece> promotion;
 };
 
+// TODO shortened pawn captures ("exd", "ed")
+const regex PAWN_MOVE_PATTERN{"[a-h][1-8]"};
+const regex PAWN_CAPTURE_PATTERN{"[a-h]x[a-h][1-8]"};
+const regex PAWN_PROMOTION_PATTERN{"[a-h][1-8][NBRQ]"};
+const regex PAWN_CAPTURE_PROMOTION_PATTERN{"[a-h]x[a-h][1-8][NBRQ]"};
+
+const regex PIECE_MOVE_PATTERN{"[NBRQK][a-h][1-8]"};
+const regex FILE_PIECE_MOVE_PATTERN{"[NBRQK][a-h][a-h][1-8]"};
+const regex RANK_PIECE_MOVE_PATTERN{"[NBRQK][1-8][a-h][1-8]"};
+const regex SQUARE_PIECE_MOVE_PATTERN{"[NBRQK][a-h][1-8][a-h][1-8]"};
+
+const regex PIECE_CAPTURE_PATTERN{"[NBRQK]x[a-h][1-8]"};
+const regex FILE_PIECE_CAPTURE_PATTERN{"[NBRQK][a-h]x[a-h][1-8]"};
+const regex RANK_PIECE_CAPTURE_PATTERN{"[NBRQK][1-8]x[a-h][1-8]"};
+const regex SQUARE_PIECE_CAPTURE_PATTERN{"[NBRQK][a-h][1-8]x[a-h][1-8]"};
+
 Move decode_move(const Board board, const string move, const bool as_white) {
   Move mv;
   mv.algebraic = move;
@@ -141,102 +162,112 @@ Move decode_move(const Board board, const string move, const bool as_white) {
 
   const short forwards = as_white ? 1 : -1;
 
-  // Without check+
-  string move_ = move;
+  if (move == "0-0" || move == "O-O") {
+    // TODO check castling rights
+    mv.castle_short = true;
 
-  if (move_[move_.length() - 1] == '+') {
-    mv.check = true;
-    move_ = move_.substr(0, move_.length() - 1);
-  }
+  } else if (move == "0-0-0" || move == "O-O-O") {
+    // TODO check castling rights
+    mv.castle_long = true;
 
-  switch (move_.length()) {
-    // TODO shortened pawn captures ("exd", "ed")
-  case 2:
-    // Pawn move, e.g. "e4";
+  } else if (regex_match(move, PAWN_MOVE_PATTERN)) { // "e4"
     mv.piece = get_piece('P', as_white);
-    mv.to = get_square(move_[0], move_[1]);
+    mv.to = get_square(move[0], move[1]);
     mv.from.file = mv.to.file;
 
     if (board[mv.from.file][mv.to.rank - forwards] == mv.piece) {
       mv.from.rank = mv.to.rank - forwards;
     } else if ((as_white && mv.to.rank == 3 || !as_white && mv.to.rank == 4) &&
-               !board[mv.from.file][mv.to.rank - forwards].has_value() &&
+               !board[mv.from.file][mv.to.rank - forwards] &&
                board[mv.from.file][mv.to.rank - 2 * forwards] == mv.piece) {
       mv.from.rank = mv.to.rank - 2 * forwards;
     } else {
       throw string(
-          "Invalid move: No eligible Pawn on " +
+          "There is no eligible Pawn on " +
           to_string(Square{mv.from.file,
                            static_cast<ushort>(mv.to.rank - forwards)}) +
           " or " +
           to_string(Square{mv.from.file,
-                           static_cast<ushort>(mv.to.rank - 2 * forwards)}));
+                           static_cast<ushort>(mv.to.rank - 2 * forwards)}) +
+          ".");
     }
-    break;
-  case 3:
-    if (move_ == "0-0" || move_ == "O-O") {
-      // TODO check castling rights
-      mv.castle_short = true;
-    } else if (PIECE_CHARS.find(move_[0]) != string::npos) {
-      // Basic piece move, e.g. "Nf6"
-      mv.piece = get_piece(move_[0], as_white);
-      mv.to = get_square(move_[1], move_[2]);
-      // TODO check available piece
-    } else if (PIECE_CHARS.find(move_[2]) != string::npos) {
-      // Promotion
-      mv.to = get_square(move_[0], move_[1]);
-      mv.promotion = get_piece(move_[2], as_white);
-      // TODO check available piece
+
+  } else if (regex_match(move, PAWN_CAPTURE_PATTERN)) { // "dxe4"
+    mv.piece = get_piece('P', as_white);
+    mv.to = get_square(move[2], move[3]);
+    mv.from = get_square(move[0], move[3] - forwards);
+    if (abs(mv.from.file - mv.to.file) != 1) {
+      throw string("Pawn must move one square diagonally when capturing.");
     }
-    break;
-  case 4:
-    if (move_[1] == 'x') {
-      // Basic capture
-      if (PIECE_CHARS.find(move_[0]) != string::npos) {
-        mv.piece = get_piece(move_[0], as_white);
-      } else if (FILE_CHARS.find(move_[0]) != string::npos) {
-        mv.piece = get_piece('P', as_white);
-        ushort file = move_[0] - 'a';
-      } else {
-        throw string("Invalid move '" + move_ + "'");
-      }
-    } else {
-      // Piece move with qualified starting rank or file
-      mv.piece = get_piece(move_[0], as_white);
-      if (PIECE_CHARS.find(mv.piece) == string::npos) {
-        throw string("Invalid move '" + move_ + "'");
-      }
-      if (FILE_CHARS.find(move_[1] != string::npos)) {
-        mv.from.file = move_[1];
-      } else if (RANK_CHARS.find(move_[1] != string::npos)) {
-        ushort rank = move_[1] - '1';
-      } else {
-        throw string("Invalid move '" + move_ + "'");
-      }
+    if (!has_piece(board, mv.from, mv.piece)) {
+      throw string("No eligible Pawn on " + to_string(mv.from) + ".");
     }
-    break;
-  case 5:
-    if (move_ == "0-0-0" || move_ == "O-O-O") {
-      // TODO check castling rights
-      mv.castle_long = true;
-    } else if (move_[1] == 'x') {
-      // Pawn capture with promotion ("dxe8Q")
-      // TODO
-    } else if (move_[2] == 'x') {
-      // Piece capture with qualified starting rank or file ("Qhxe1")
-      // TODO
-    } else {
-      // Piece move with qualified starting rank and file ("Qh4e1")
-      // TODO
+    mv.capture = find_piece(board, mv.to);
+    // TODO en passant
+    if (!mv.capture) {
+      throw string("There is nothing to capture on " + to_string(mv.to) + ".");
     }
-    break;
-  case 6:
-    // Piece capture with qualified starting rank and file ""Qh4xe1""
+    if (as_white == is_white(mv.capture.value())) {
+      throw string("Can't capture your own piece.");
+    }
+
+  } else if (regex_match(move, PAWN_PROMOTION_PATTERN)) { // "e8Q"
+    mv.piece = get_piece('P', as_white);
+    mv.to = get_square(move[0], move[1]);
+    mv.promotion = get_piece(move[2], as_white);
     // TODO
-    break;
-  default:
-    throw string("Invalid move '" + move_ + "'");
-    break;
+
+  } else if (regex_match(move, PAWN_CAPTURE_PROMOTION_PATTERN)) { // "dxe8Q"
+    mv.piece = get_piece('P', as_white);
+    mv.to = get_square(move[2], move[3]);
+    mv.promotion = get_piece(move[4], as_white);
+    // TODO
+
+  } else if (regex_match(move, PIECE_MOVE_PATTERN)) { // "Qe4"
+    mv.piece = get_piece(move[0], as_white);
+    mv.to = get_square(move[1], move[2]);
+    // TODO
+
+  } else if (regex_match(move, FILE_PIECE_MOVE_PATTERN)) { // "Qde4"
+    mv.piece = get_piece(move[0], as_white);
+    mv.to = get_square(move[2], move[3]);
+    // TODO
+
+  } else if (regex_match(move, RANK_PIECE_MOVE_PATTERN)) { // "Q3e4"
+    mv.piece = get_piece(move[0], as_white);
+    mv.to = get_square(move[2], move[3]);
+    // TODO
+
+  } else if (regex_match(move, SQUARE_PIECE_MOVE_PATTERN)) { // "Qd3e4"
+    mv.piece = get_piece(move[0], as_white);
+    mv.to = get_square(move[3], move[4]);
+    // TODO
+
+  } else if (regex_match(move, PIECE_CAPTURE_PATTERN)) { // "Qxe4"
+    mv.piece = get_piece(move[0], as_white);
+    mv.to = get_square(move[2], move[3]);
+    // TODO
+
+  } else if (regex_match(move, FILE_PIECE_CAPTURE_PATTERN)) { // "Qdxe4"
+    mv.piece = get_piece(move[0], as_white);
+    mv.to = get_square(move[3], move[4]);
+    // TODO
+
+  } else if (regex_match(move, RANK_PIECE_CAPTURE_PATTERN)) { // "Q3xe4"
+    mv.piece = get_piece(move[0], as_white);
+    mv.to = get_square(move[3], move[4]);
+    // TODO
+
+  } else if (regex_match(move, SQUARE_PIECE_CAPTURE_PATTERN)) { // "Qd3xe4"
+    mv.piece = get_piece(move[0], as_white);
+    mv.to = get_square(move[4], move[5]);
+    // TODO
+
+  } else {
+    throw string("'" + move +
+                 "' is not a known move format.\n"
+                 "Note: Do not add any special characters like + # = "
+                 "to indicate check/mate/promotion.");
   }
   return mv;
 }
