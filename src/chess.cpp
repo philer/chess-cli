@@ -127,36 +127,34 @@ struct Square {
   uint8_t rank;
 };
 
-const Square get_square(const char file, const char rank) {
+Square get_square(const char file, const char rank) {
   return Square{
       static_cast<uint8_t>((file - 'a')), static_cast<uint8_t>((rank - '1'))};
 }
 
-const string to_string(const Square &square) {
+string to_string(const Square &square) {
   return {
       static_cast<char>((square.file + 'a')),
       static_cast<char>((square.rank + '1'))};
 }
 
-const bool exists(const Square &square) {
+bool exists(const Square &square) {
   return 0 <= square.file && square.file <= 7 && 0 <= square.rank
          && square.rank <= 7;
 }
 
-const optional<ColorPiece> find_piece(
-    const Board &board, const Square &square
-) {
+optional<ColorPiece> find_piece(const Board &board, const Square &square) {
   return board[square.file][square.rank];
 }
 
-const bool has_piece(
+bool has_piece(
     const Board &board, const Square &square, const ColorPiece &piece
 ) {
   return board[square.file][square.rank] == piece;
 }
 
 template <size_t N>
-const vector<Square> find_line_moving_pieces(
+vector<Square> find_line_moving_pieces(
     const Board &board,
     const Square &target_square,
     const ColorPiece &piece,
@@ -183,7 +181,7 @@ const vector<Square> find_line_moving_pieces(
   return found;
 }
 
-const vector<Square> find_bishops(
+vector<Square> find_bishops(
     const Board &board, const Square &target_square, const ColorPiece &piece
 ) {
   return find_line_moving_pieces<4>(
@@ -191,7 +189,7 @@ const vector<Square> find_bishops(
   );
 }
 
-const vector<Square> find_rooks(
+vector<Square> find_rooks(
     const Board &board, const Square &target_square, const ColorPiece &piece
 ) {
   return find_line_moving_pieces<4>(
@@ -199,7 +197,7 @@ const vector<Square> find_rooks(
   );
 }
 
-const vector<Square> find_queens(
+vector<Square> find_queens(
     const Board &board, const Square &target_square, const ColorPiece &piece
 ) {
   return find_line_moving_pieces<8>(
@@ -217,7 +215,7 @@ const vector<Square> find_queens(
   );
 }
 
-const vector<Square> find_direct_moving_pieces(
+vector<Square> find_direct_moving_pieces(
     const Board &board,
     const Square &target_square,
     const ColorPiece &piece,
@@ -235,7 +233,7 @@ const vector<Square> find_direct_moving_pieces(
   return found;
 }
 
-const vector<Square> find_kings(
+vector<Square> find_kings(
     const Board &board, const Square &target_square, const ColorPiece &piece
 ) {
   return find_direct_moving_pieces(
@@ -253,7 +251,7 @@ const vector<Square> find_kings(
   );
 }
 
-const vector<Square> find_knights(
+vector<Square> find_knights(
     const Board &board, const Square &target_square, const ColorPiece &piece
 ) {
   return find_direct_moving_pieces(
@@ -271,7 +269,7 @@ const vector<Square> find_knights(
   );
 }
 
-const vector<Square> find_pieces(
+vector<Square> find_pieces(
     const Board &board, const Square &target_square, const ColorPiece &piece
 ) {
   switch (piece.piece) {
