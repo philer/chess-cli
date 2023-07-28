@@ -57,9 +57,10 @@ bool operator==(const ColorPiece &a, const ColorPiece &b) {
   return a.color == b.color && a.piece == b.piece;
 }
 
-typedef optional<ColorPiece> Board[8][8];
+typedef array<array<optional<ColorPiece>, 8>, 8> Board;
 
-void init_board(Board &board) {
+Board create_board() {
+  Board board;
   // empty squares
   for (uint8_t rank = 2; rank < 6; ++rank) {
     for (uint8_t file = 0; file < 8; ++file) {
@@ -92,6 +93,8 @@ void init_board(Board &board) {
   board[5][7] = BLACK_BISHOP;
   board[6][7] = BLACK_KNIGHT;
   board[7][7] = BLACK_ROOK;
+
+  return board;
 }
 
 // Disallowing lower case piece letters for now.
@@ -569,9 +572,7 @@ void print_board(const Board &board) {
 }
 
 int main() {
-  Board board;
-  init_board(board);
-
+  Board board = create_board();
   Color color = white;
   uint move_no = 0;
   string move;
