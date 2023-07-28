@@ -407,7 +407,7 @@ Move decode_move(const Board board, const string move, const Color color) {
 
   } else if (regex_match(move, PIECE_CAPTURE_PATTERN)) {  // "Qxe4"
     mv.piece = get_piece(move[0], color);
-    mv.to = get_square(move[1], move[2]);
+    mv.to = get_square(move[2], move[3]);
     const vector<Square> candidates = find_pieces(board, mv.to, mv.piece);
     switch (candidates.size()) {
       case 1:
