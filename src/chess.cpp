@@ -26,7 +26,7 @@ enum Color : bool {
   white = true,
 };
 
-enum Piece : ushort {
+enum Piece : uint8_t {
   black_pawn = 0 << 1,
   black_knight = 1 << 1,
   black_bishop = 2 << 1,
@@ -42,21 +42,21 @@ enum Piece : ushort {
 };
 
 const Color get_color(Piece piece) {
-  return static_cast<Color>(piece & static_cast<ushort>(white));
+  return static_cast<Color>(piece & static_cast<uint8_t>(white));
 }
 
 typedef optional<Piece> Board[8][8];
 
 void init_board(Board board) {
   // empty squares
-  for (ushort rank = 2; rank < 6; ++rank) {
-    for (ushort file = 0; file < 8; ++file) {
+  for (uint8_t rank = 2; rank < 6; ++rank) {
+    for (uint8_t file = 0; file < 8; ++file) {
       board[file][rank] = nullopt;
     }
   }
 
   // pawns
-  for (ushort file = 0; file < 8; ++file) {
+  for (uint8_t file = 0; file < 8; ++file) {
     board[file][1] = white_pawn;
     board[file][6] = black_pawn;
   }
@@ -108,13 +108,13 @@ Piece get_piece(const char piece_character, const Color color) {
 }
 
 struct Square {
-  ushort file;
-  ushort rank;
+  uint8_t file;
+  uint8_t rank;
 };
 
 const Square get_square(const char file, const char rank) {
   return Square{
-      static_cast<ushort>((file - 'a')), static_cast<ushort>((rank - '1'))};
+      static_cast<uint8_t>((file - 'a')), static_cast<uint8_t>((rank - '1'))};
 }
 
 const string to_string(Square square) {
@@ -143,14 +143,14 @@ const vector<Square> find_line_moving_pieces(
     const Board board,
     const Square target_square,
     const Piece piece,
-    const array<tuple<short, short>, N> directions
+    const array<tuple<int8_t, int8_t>, N> directions
 ) {
   vector<Square> found;
   for (const auto [d_file, d_rank] : directions) {
-    for (ushort offset = 1;; ++offset) {
+    for (uint8_t offset = 1;; ++offset) {
       Square square = {
-          static_cast<ushort>(target_square.file + offset * d_file),
-          static_cast<ushort>(target_square.rank + offset * d_rank)};
+          static_cast<uint8_t>(target_square.file + offset * d_file),
+          static_cast<uint8_t>(target_square.rank + offset * d_rank)};
       if (!exists(square)) {
         break;
       }
@@ -204,13 +204,13 @@ const vector<Square> find_direct_moving_pieces(
     const Board board,
     const Square target_square,
     const Piece piece,
-    const array<tuple<short, short>, 8> moves
+    const array<tuple<int8_t, int8_t>, 8> moves
 ) {
   vector<Square> found;
   for (const auto [d_file, d_rank] : moves) {
     Square square = {
-        static_cast<ushort>(target_square.file + d_file),
-        static_cast<ushort>(target_square.rank + d_rank)};
+        static_cast<uint8_t>(target_square.file + d_file),
+        static_cast<uint8_t>(target_square.rank + d_rank)};
     if (exists(square) && find_piece(board, square) == piece) {
       found.push_back(square);
     }
@@ -279,14 +279,14 @@ struct Move {
   Square to;
   bool check;
   bool castle_long;
-  bool castle_short;
+  bool castle_int8_t;
   // bool en_passant;  // TODO
   Piece piece;
   optional<Piece> capture;
   optional<Piece> promotion;
 };
 
-// TODO shortened pawn captures ("exd", "ed")
+// TODO int8_tened pawn captures ("exd", "ed")
 const regex PAWN_MOVE_PATTERN{"[a-h][1-8]"};
 const regex PAWN_CAPTURE_PATTERN{"[a-h]x[a-h][1-8]"};
 const regex PAWN_PROMOTION_PATTERN{"[a-h][1-8][NBRQ]"};
@@ -307,13 +307,13 @@ Move decode_move(const Board board, const string move, const Color color) {
   mv.algebraic = move;
   mv.check = false;
   mv.castle_long = false;
-  mv.castle_short = false;
+  mv.castle_int8_t = false;
 
-  const short forwards = color ? 1 : -1;
+  const int8_t forwards = color ? 1 : -1;
 
   if (move == "0-0" || move == "O-O") {
     // TODO check castling rights
-    mv.castle_short = true;
+    mv.castle_int8_t = true;
 
   } else if (move == "0-0-0" || move == "O-O-O") {
     // TODO check castling rights
@@ -334,10 +334,10 @@ Move decode_move(const Board board, const string move, const Color color) {
       throw string(
           "There is no eligible Pawn on "
           + to_string(Square{
-              mv.from.file, static_cast<ushort>(mv.to.rank - forwards)})
+              mv.from.file, static_cast<uint8_t>(mv.to.rank - forwards)})
           + " or "
           + to_string(Square{
-              mv.from.file, static_cast<ushort>(mv.to.rank - 2 * forwards)})
+              mv.from.file, static_cast<uint8_t>(mv.to.rank - 2 * forwards)})
           + "."
       );
     }
@@ -457,7 +457,7 @@ Move decode_move(const Board board, const string move, const Color color) {
 void apply_move(Board board, const Move move) {
   if (move.castle_long) {
     // TODO
-  } else if (move.castle_short) {
+  } else if (move.castle_int8_t) {
     // TODO
   }
 
@@ -500,13 +500,13 @@ map<Piece, Piece> inverted_pieces{
     {black_pawn, white_pawn},
 };
 
-const ushort forward8[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-const ushort reverse8[8] = {7, 6, 5, 4, 3, 2, 1, 0};
+const uint8_t forward8[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+const uint8_t reverse8[8] = {7, 6, 5, 4, 3, 2, 1, 0};
 
-const ushort BOARD_HEADER_HEIGHT = 2;
-const ushort BOARD_CONTENT_HEIGHT = 8;
-const ushort BOARD_FOOTER_HEIGHT = 1;
-const ushort BOARD_HEIGHT =
+const uint8_t BOARD_HEADER_HEIGHT = 2;
+const uint8_t BOARD_CONTENT_HEIGHT = 8;
+const uint8_t BOARD_FOOTER_HEIGHT = 1;
+const uint8_t BOARD_HEIGHT =
     BOARD_HEADER_HEIGHT + BOARD_CONTENT_HEIGHT + BOARD_FOOTER_HEIGHT;
 
 array<string, BOARD_HEIGHT> board_to_lines(
@@ -518,10 +518,10 @@ array<string, BOARD_HEIGHT> board_to_lines(
   lines[10] = color ? "  a b c d e f g h   " : "  h g f e d c b a   ";
 
   Color square_color = black;
-  for (const ushort rank : color ? reverse8 : forward8) {
-    const ushort line = (color ? 7 - rank : rank) + BOARD_HEADER_HEIGHT;
+  for (const uint8_t rank : color ? reverse8 : forward8) {
+    const uint8_t line = (color ? 7 - rank : rank) + BOARD_HEADER_HEIGHT;
     lines[line] = to_string(rank + 1) + " ";
-    for (const ushort file : color ? forward8 : reverse8) {
+    for (const uint8_t file : color ? forward8 : reverse8) {
       string piece_character;
       if (board[file][rank] != nullopt) {
         Piece piece = board[file][rank].value();
