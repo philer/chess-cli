@@ -28,7 +28,9 @@ enum Color : bool {
 };
 
 // Overloading operator! to return Color instead of bool leads to segfault
-Color invert(const Color color) { return static_cast<Color>(!color); }
+Color invert(const Color color) {
+  return static_cast<Color>(!color);
+}
 
 enum Piece : uint8_t {
   pawn,
@@ -42,7 +44,28 @@ enum Piece : uint8_t {
 struct ColorPiece {
   Color color;
   Piece piece;
+
+  bool operator==(const ColorPiece &other) const {
+    return color == other.color && piece == other.piece;
+  }
 };
+
+ColorPiece invert(ColorPiece piece) {
+  piece.color = invert(piece.color);
+  return piece;
+}
+
+string to_string(const ColorPiece &piece) {
+  static const map<Piece, array<string, 2>> UTF8_PIECES{
+      {king, {"♔", "♚"}},
+      {queen, {"♕", "♛"}},
+      {rook, {"♖", "♜"}},
+      {bishop, {"♗", "♝"}},
+      {knight, {"♘", "♞"}},
+      {pawn, {"♙", "♟︎"}},
+  };
+  return UTF8_PIECES.at(piece.piece)[piece.color];
+}
 
 const ColorPiece WHITE_PAWN = {white, pawn};
 const ColorPiece WHITE_KNIGHT = {white, knight};
@@ -56,28 +79,6 @@ const ColorPiece BLACK_BISHOP = {black, bishop};
 const ColorPiece BLACK_ROOK = {black, rook};
 const ColorPiece BLACK_QUEEN = {black, queen};
 const ColorPiece BLACK_KING = {black, king};
-
-bool operator==(const ColorPiece &a, const ColorPiece &b) {
-  return a.color == b.color && a.piece == b.piece;
-}
-
-ColorPiece invert(ColorPiece piece) {
-  piece.color = invert(piece.color);
-  return piece;
-}
-
-const map<Piece, array<string, 2>> UTF8_PIECES{
-    {king, {"♔", "♚"}},
-    {queen, {"♕", "♛"}},
-    {rook, {"♖", "♜"}},
-    {bishop, {"♗", "♝"}},
-    {knight, {"♘", "♞"}},
-    {pawn, {"♙", "♟︎"}},
-};
-
-string to_string(const ColorPiece &piece) {
-  return UTF8_PIECES.at(piece.piece)[piece.color];
-}
 
 typedef array<array<optional<ColorPiece>, 8>, 8> Board;
 
@@ -119,6 +120,37 @@ Board create_board() {
   return board;
 }
 
+struct Square {
+  uint8_t file;
+  uint8_t rank;
+
+  bool exists() const {
+    return 0 <= file && file <= 7 && 0 <= rank && rank <= 7;
+  }
+};
+
+string to_string(const Square &square) {
+  return {
+      static_cast<char>((square.file + 'a')),
+      static_cast<char>((square.rank + '1'))};
+}
+
+Square get_square(const char file, const char rank) {
+  return Square{
+      static_cast<uint8_t>((file - 'a')), static_cast<uint8_t>((rank - '1'))};
+}
+
+struct Move {
+  string algebraic;
+  ColorPiece piece;
+  Square from;
+  Square to;
+  optional<ColorPiece> capture;
+  optional<ColorPiece> promotion;
+  // bool en_passant;  // TODO
+  bool check;
+};
+
 // Disallowing lower case piece letters for now.
 // Ambiguous case: "bc6" could be a bishop or a pawn capture
 static const string PIECE_CHARS = "NBRQK";
@@ -142,27 +174,6 @@ ColorPiece get_piece(const char piece_character, const Color color) {
       piece_str = piece_character;
       throw string("Invalid piece '" + piece_str + "'");
   }
-}
-
-struct Square {
-  uint8_t file;
-  uint8_t rank;
-};
-
-Square get_square(const char file, const char rank) {
-  return Square{
-      static_cast<uint8_t>((file - 'a')), static_cast<uint8_t>((rank - '1'))};
-}
-
-string to_string(const Square &square) {
-  return {
-      static_cast<char>((square.file + 'a')),
-      static_cast<char>((square.rank + '1'))};
-}
-
-bool exists(const Square &square) {
-  return 0 <= square.file && square.file <= 7 && 0 <= square.rank
-         && square.rank <= 7;
 }
 
 optional<ColorPiece> find_piece(const Board &board, const Square &square) {
@@ -190,7 +201,7 @@ vector<Square> find_line_moving_pieces(
       Square square = {
           static_cast<uint8_t>(target_square.file + offset * d_file),
           static_cast<uint8_t>(target_square.rank + offset * d_rank)};
-      if (!exists(square)) {
+      if (!square.exists()) {
         break;
       }
       const optional<ColorPiece> found_piece = find_piece(board, square);
@@ -206,7 +217,6 @@ vector<Square> find_line_moving_pieces(
   return found;
 }
 
-
 vector<Square> find_direct_moving_pieces(
     const Board &board,
     const Square &target_square,
@@ -220,7 +230,7 @@ vector<Square> find_direct_moving_pieces(
     Square square = {
         static_cast<uint8_t>(target_square.file + d_file),
         static_cast<uint8_t>(target_square.rank + d_rank)};
-    if (!exists(square)) {
+    if (!square.exists()) {
       continue;
     }
     if (file && square.file != *file || rank && square.rank != *rank) {
@@ -241,7 +251,7 @@ vector<Square> find_pieces(
     optional<uint8_t> rank = nullopt
 ) {
   switch (piece.piece) {
-    // clang-format off
+      // clang-format off
     case knight:
       return find_direct_moving_pieces(
           board, target_square, piece,
@@ -280,17 +290,6 @@ vector<Square> find_pieces(
       throw string("Something went wrong!");
   }
 }
-
-struct Move {
-  string algebraic;
-  ColorPiece piece;
-  Square from;
-  Square to;
-  optional<ColorPiece> capture;
-  optional<ColorPiece> promotion;
-  // bool en_passant;  // TODO
-  bool check;
-};
 
 // TODO shortened pawn captures ("exd", "ed")
 const regex PAWN_MOVE_PATTERN{"^[a-h][1-8][NBRQ]?$"};
@@ -508,7 +507,9 @@ void apply_move(Board &board, const Move &move) {
 const string ANSI_INVERT = "\033[0;0;7m";
 const string ANSI_RESET = "\033[0m";
 
-string invert(const string &str) { return ANSI_INVERT + str + ANSI_RESET; }
+string invert(const string &str) {
+  return ANSI_INVERT + str + ANSI_RESET;
+}
 
 const uint8_t FORWARD_8[8] = {0, 1, 2, 3, 4, 5, 6, 7};
 const uint8_t REVERSE_8[8] = {7, 6, 5, 4, 3, 2, 1, 0};
