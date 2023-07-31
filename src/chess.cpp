@@ -262,21 +262,20 @@ vector<Square> find_pieces(
 
 struct Move {
   string algebraic;
+  ColorPiece piece;
   Square from;
   Square to;
-  bool check;
-  bool castle_long;
-  bool castle_int8_t;
-  // bool en_passant;  // TODO
-  ColorPiece piece;
   optional<ColorPiece> capture;
   optional<ColorPiece> promotion;
+  // bool en_passant;  // TODO
+  bool check;
 };
 
 // TODO shortened pawn captures ("exd", "ed")
 const regex PAWN_MOVE_PATTERN{"^[a-h][1-8][NBRQ]?$"};
 const regex PAWN_CAPTURE_PATTERN{"^[a-h]x[a-h][1-8][NBRQ]?$"};
 const regex PIECE_MOVE_OR_CAPTURE_PATTERN{"^[NBRQK][a-h]?[1-8]?x?[a-h][1-8]$"};
+const regex CASTLING_PATTERN{"^[O0]-[O0](?:-[O0])?$", regex::icase};
 
 optional<ColorPiece> get_promotion(
     const Board $board, const Move &move, const Color color
@@ -296,25 +295,22 @@ optional<ColorPiece> get_promotion(
   return promotion;
 }
 
+/**
+ * Extract all relevant details from a move given in algebraic notation on a
+ * specific board and check if it is legal to apply.
+ *
+ * TODO en passant
+ * TODO check castling rights
+ * TODO check for checks & mate
+ */
 Move decode_move(const Board &board, const string &move, const Color color) {
   Move mv;
   mv.algebraic = move;
   mv.check = false;
-  mv.castle_long = false;
-  mv.castle_int8_t = false;
-
   const int8_t forwards = color ? 1 : -1;
   const uint8_t len = move.size();
 
-  if (move == "0-0" || move == "O-O") {
-    // TODO check castling rights
-    mv.castle_int8_t = true;
-
-  } else if (move == "0-0-0" || move == "O-O-O") {
-    // TODO check castling rights
-    mv.castle_long = true;
-
-  } else if (regex_match(move, PAWN_MOVE_PATTERN)) {  // "e4"
+  if (regex_match(move, PAWN_MOVE_PATTERN)) {  // "e4"
     mv.piece = get_piece('P', color);
     mv.to = get_square(move[0], move[1]);
     mv.from.file = mv.to.file;
@@ -418,6 +414,23 @@ Move decode_move(const Board &board, const string &move, const Color color) {
       }
     }
 
+  } else if (regex_match(move, CASTLING_PATTERN)) {
+    // TODO check castling rights
+    // TODO check king passing squares under check
+    const bool castle_long = move.length() == 5;
+    const uint8_t rank = white ? 0 : 7;
+    if (board[4][rank] != ColorPiece{color, king}
+        || (castle_long
+                ? board[0][rank] != ColorPiece{color, rook} || board[1][rank]
+                      || board[2][rank] && !board[3][rank]
+                : board[7][rank] != ColorPiece{color, rook} || board[6][rank]
+                      || board[5][rank])) {
+      throw string("You can't castle on this side of the board right now.");
+    }
+    mv.piece = ColorPiece{color, king};
+    mv.from = Square{4, rank};
+    mv.to = Square{static_cast<uint8_t>(castle_long ? 2 : 6), rank};
+
   } else {
     throw string(
         "'" + move
@@ -429,17 +442,30 @@ Move decode_move(const Board &board, const string &move, const Color color) {
   return mv;
 }
 
+/**
+ * Execute a decoded move on the given board. This function assumes that all
+ * checks have passed and that it can be applied to the given board to create a
+ * valid game state.
+ */
 void apply_move(Board &board, const Move &move) {
-  if (move.castle_long) {
-    // TODO
-  } else if (move.castle_int8_t) {
-    // TODO
-  }
-
+  const ColorPiece piece = *board[move.from.file][move.from.rank];
   board[move.from.file][move.from.rank] = nullopt;
-  board[move.to.file][move.to.rank] = move.promotion.value_or(move.piece);
+  board[move.to.file][move.to.rank] = move.promotion.value_or(piece);
 
   // TODO capture en passant
+
+  // Castling
+  if ((piece == WHITE_KING || piece == BLACK_KING)
+      && abs(move.from.file - move.to.file) == 2) {
+    cout << "castling";
+    if (move.to.file == 2) {  // Castling long
+      board[3][move.to.rank] = board[0][move.to.rank];
+      board[0][move.to.rank] = nullopt;
+    } else {  // Castling short
+      board[5][move.to.rank] = board[7][move.to.rank];
+      board[7][move.to.rank] = nullopt;
+    }
+  }
 }
 
 // const string ANSI_RED = "\033[31m";
