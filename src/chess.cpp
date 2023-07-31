@@ -27,6 +27,9 @@ enum Color : bool {
   black = false,
 };
 
+// Overloading operator! to return Color instead of bool leads to segfault
+Color invert(const Color color) { return static_cast<Color>(!color); }
+
 enum Piece : uint8_t {
   pawn,
   knight,
@@ -56,6 +59,24 @@ const ColorPiece BLACK_KING = {black, king};
 
 bool operator==(const ColorPiece &a, const ColorPiece &b) {
   return a.color == b.color && a.piece == b.piece;
+}
+
+ColorPiece invert(ColorPiece piece) {
+  piece.color = invert(piece.color);
+  return piece;
+}
+
+const map<Piece, array<string, 2>> UTF8_PIECES{
+    {king, {"♔", "♚"}},
+    {queen, {"♕", "♛"}},
+    {rook, {"♖", "♜"}},
+    {bishop, {"♗", "♝"}},
+    {knight, {"♘", "♞"}},
+    {pawn, {"♙", "♟︎"}},
+};
+
+string to_string(const ColorPiece &piece) {
+  return UTF8_PIECES.at(piece.piece)[piece.color];
 }
 
 typedef array<array<optional<ColorPiece>, 8>, 8> Board;
@@ -299,7 +320,7 @@ optional<ColorPiece> get_promotion(
  * Extract all relevant details from a move given in algebraic notation on a
  * specific board and check if it is legal to apply.
  *
- * TODO en passant
+ * TODO en passant legal
  * TODO check castling rights
  * TODO check for checks & mate
  */
@@ -355,9 +376,18 @@ Move decode_move(const Board &board, const string &move, const Color color) {
       throw string("No eligible Pawn on " + to_string(mv.from) + ".");
     }
     mv.capture = find_piece(board, mv.to);
-    // TODO en passant
     if (!mv.capture) {
-      throw string("There is nothing to capture on " + to_string(mv.to) + ".");
+      // Check for en passant capture
+      // TODO check if opponent's pawn just moved by two ranks
+      const optional<ColorPiece> en_passant_capture =
+          find_piece(board, get_square(move[2], move[3] - forwards));
+      if (en_passant_capture == ColorPiece{invert(color), pawn}) {
+        mv.capture = en_passant_capture;
+      } else {
+        throw string(
+            "There is nothing to capture on " + to_string(mv.to) + "."
+        );
+      }
     }
     if (color == mv.capture->color) {
       throw string("Can't capture your own piece.");
@@ -449,19 +479,25 @@ Move decode_move(const Board &board, const string &move, const Color color) {
  */
 void apply_move(Board &board, const Move &move) {
   const ColorPiece piece = *board[move.from.file][move.from.rank];
+
+  // capture en passant
+  const optional<ColorPiece> capture = board[move.to.file][move.to.rank];
+  if (!capture && move.capture == ColorPiece(invert(piece.color), pawn)) {
+    board[move.to.file][move.from.rank] = nullopt;
+  }
+
+  // move
   board[move.from.file][move.from.rank] = nullopt;
   board[move.to.file][move.to.rank] = move.promotion.value_or(piece);
 
-  // TODO capture en passant
-
-  // Castling
+  // castling
   if ((piece == WHITE_KING || piece == BLACK_KING)
       && abs(move.from.file - move.to.file) == 2) {
     cout << "castling";
-    if (move.to.file == 2) {  // Castling long
+    if (move.to.file == 2) {  // castling long
       board[3][move.to.rank] = board[0][move.to.rank];
       board[0][move.to.rank] = nullopt;
-    } else {  // Castling short
+    } else {  // castling short
       board[5][move.to.rank] = board[7][move.to.rank];
       board[7][move.to.rank] = nullopt;
     }
@@ -472,14 +508,7 @@ void apply_move(Board &board, const Move &move) {
 const string ANSI_INVERT = "\033[0;0;7m";
 const string ANSI_RESET = "\033[0m";
 
-const map<Piece, array<string, 2>> UTF8_PIECES{
-    {king, {"♚", "♔"}},
-    {queen, {"♛", "♕"}},
-    {rook, {"♜", "♖"}},
-    {bishop, {"♝", "♗"}},
-    {knight, {"♞", "♘"}},
-    {pawn, {"♟︎", "♙"}},
-};
+string invert(const string &str) { return ANSI_INVERT + str + ANSI_RESET; }
 
 const uint8_t FORWARD_8[8] = {0, 1, 2, 3, 4, 5, 6, 7};
 const uint8_t REVERSE_8[8] = {7, 6, 5, 4, 3, 2, 1, 0};
@@ -504,23 +533,14 @@ array<string, BOARD_HEIGHT> board_to_lines(
     lines[line] = to_string(rank + 1) + " ";
     for (const uint8_t file : color ? FORWARD_8 : REVERSE_8) {
       optional<ColorPiece> piece = board[file][rank];
-      string piece_character;
+      string piece_string = "  ";
       if (piece) {
-        if (square_color == black) {
-          piece->color = static_cast<Color>(!piece->color);
-        }
-        piece_character = UTF8_PIECES.at(piece->piece)[piece->color];
-      } else {
-        piece_character = " ";
+        piece_string = to_string(square_color ? invert(*piece) : *piece) + " ";
       }
-      if (square_color == black) {
-        lines[line] += piece_character + " ";
-      } else {
-        lines[line] += ANSI_INVERT + piece_character + " " + ANSI_RESET;
-      }
-      square_color = static_cast<Color>(!square_color);
+      lines[line] += square_color ? invert(piece_string) : piece_string;
+      square_color = invert(square_color);
     }
-    square_color = static_cast<Color>(!square_color);
+    square_color = invert(square_color);
     lines[line] += " " + to_string(rank + 1);
   }
 
@@ -595,7 +615,7 @@ int main() {
 
     cout << endl;
     apply_move(board, decoded_move);
-    color = static_cast<Color>(!color);
+    color = invert(color);
   }
 
   cout << "\nBye." << endl;
