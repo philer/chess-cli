@@ -139,6 +139,9 @@ Square get_square(const char file, const char rank) {
   return Square{
       static_cast<uint8_t>((file - 'a')), static_cast<uint8_t>((rank - '1'))};
 }
+Square get_square(const string &square) {
+  return get_square(square[0], square[1]);
+}
 
 struct Move {
   string algebraic;
@@ -300,18 +303,19 @@ vector<Square> find_pieces(
 }
 
 // TODO shortened pawn captures ("exd", "ed")
-const regex PAWN_MOVE_PATTERN{"^[a-h][1-8][NBRQ]?$"};
-const regex PAWN_CAPTURE_PATTERN{"^[a-h]x[a-h][1-8][NBRQ]?$"};
-const regex PIECE_MOVE_OR_CAPTURE_PATTERN{"^[NBRQK][a-h]?[1-8]?x?[a-h][1-8]$"};
-const regex CASTLING_PATTERN{"^[O0]-[O0](?:-[O0])?$", regex::icase};
+const regex PAWN_MOVE_PATTERN{"^([a-h][1-8])(:?=?([NBRQ]))?(?:\b|$)"};
+const regex PAWN_CAPTURE_PATTERN{
+    "^([a-h])x([a-h][1-8])(:?=?([NBRQ]))?(?:\b|$)"};
+const regex PIECE_MOVE_OR_CAPTURE_PATTERN{
+    "^([NBRQK])([a-h])?([1-8])?(x)?([a-h][1-8])(?:\b|$)"};
+const regex CASTLING_PATTERN{"^[O0]-?[O0](-?[O0])?(?:\b|$)", regex::icase};
 
 optional<ColorPiece> get_promotion(
-    const Board $board, const Move &move, const Color color
+    const Move &move, const Color color, const ssub_match &promo_match
 ) {
   optional<ColorPiece> promotion = nullopt;
-  if (string("NBRQ").find(move.algebraic.back()) != string::npos) {
-    // could use try-catch instead
-    promotion = get_piece(move.algebraic.back(), color);
+  if (promo_match.matched) {
+    promotion = get_piece(string(promo_match)[0], color);
   }
   const bool must_promote = color == white && move.to.rank == 7
                             || color == black && move.to.rank == 0;
@@ -337,10 +341,11 @@ Move decode_move(const Board &board, const string &move, const Color color) {
   mv.check = false;
   const int8_t forwards = color ? 1 : -1;
   const uint8_t len = move.size();
+  smatch match;
 
-  if (regex_match(move, PAWN_MOVE_PATTERN)) {  // "e4"
+  if (regex_match(move, match, PAWN_MOVE_PATTERN)) {  // "e4"
     mv.piece = get_piece('P', color);
-    mv.to = get_square(move[0], move[1]);
+    mv.to = get_square(match[1]);
     mv.from.file = mv.to.file;
 
     if (board[mv.from.file][mv.to.rank - forwards] == mv.piece) {
@@ -370,11 +375,11 @@ Move decode_move(const Board &board, const string &move, const Color color) {
       );
     }
 
-    mv.promotion = get_promotion(board, mv, color);
+    mv.promotion = get_promotion(mv, color, match[2]);
 
-  } else if (regex_match(move, PAWN_CAPTURE_PATTERN)) {  // "dxe4"
+  } else if (regex_match(move, match, PAWN_CAPTURE_PATTERN)) {  // "dxe4"
     mv.piece = get_piece('P', color);
-    mv.to = get_square(move[2], move[3]);
+    mv.to = get_square(match[2]);
     mv.from = get_square(move[0], move[3] - forwards);
     if (abs(mv.from.file - mv.to.file) != 1) {
       throw string("Pawn must move one square diagonally when capturing.");
@@ -400,24 +405,21 @@ Move decode_move(const Board &board, const string &move, const Color color) {
       throw string("Can't capture your own piece.");
     }
 
-    mv.promotion = get_promotion(board, mv, color);
+    mv.promotion = get_promotion(mv, color, match[3]);
 
-  } else if (regex_match(move, PIECE_MOVE_OR_CAPTURE_PATTERN)) {
+  } else if (regex_match(move, match, PIECE_MOVE_OR_CAPTURE_PATTERN)) {
     // "Qe4, Qxe4, Qde4, Qdxe4, Q3e4, Q3xe4, Qd3e4, Qd3xe4"
-
     mv.piece = get_piece(move[0], color);
-    mv.to = get_square(move[len - 2], move[len - 1]);
+    mv.to = get_square(match[5]);
 
     // Decode optional starting square qualifiers
-    optional<char> from_file = nullopt;
-    optional<char> from_rank = nullopt;
-    for (const char detail : move.substr(1, len - 3)) {
-      if (string("abcdefgh").find(detail) != string::npos) {
-        from_file = detail - 'a';
-      } else if (string("12345678").find(detail) != string::npos) {
-        from_rank = detail - '1';
-        break;
-      }
+    optional<uint8_t> from_file = nullopt;
+    optional<uint8_t> from_rank = nullopt;
+    if (match[2].matched) {
+      from_file = string(match[2])[0] - 'a';
+    }
+    if (match[3].matched) {
+      from_rank = string(match[3])[0] - '1';
     }
 
     // Search for matching pieces
@@ -435,7 +437,7 @@ Move decode_move(const Board &board, const string &move, const Color color) {
 
     // Check for captures
     mv.capture = find_piece(board, mv.to);
-    if (move[len - 3] == 'x') {
+    if (match[3].matched) {
       if (!mv.capture) {
         throw string(
             "There is nothing to capture on " + to_string(mv.to) + "."
@@ -451,10 +453,10 @@ Move decode_move(const Board &board, const string &move, const Color color) {
       }
     }
 
-  } else if (regex_match(move, CASTLING_PATTERN)) {
+  } else if (regex_match(move, match, CASTLING_PATTERN)) {
     // TODO check castling rights
     // TODO check king passing squares under check
-    const bool castle_long = move.length() == 5;
+    const bool castle_long = match[1].matched;
     const uint8_t rank = white ? 0 : 7;
     if (board[4][rank] != ColorPiece{color, king}
         || (castle_long
