@@ -151,6 +151,14 @@ struct Move {
   bool check;
 };
 
+struct Game {
+  Board board;
+  vector<Move> history;
+
+  Game() : board(create_board()), history({}){};
+};
+
+
 // Disallowing lower case piece letters for now.
 // Ambiguous case: "bc6" could be a bishop or a pawn capture
 static const string PIECE_CHARS = "NBRQK";
@@ -492,7 +500,6 @@ void apply_move(Board &board, const Move &move) {
   // castling
   if ((piece == WHITE_KING || piece == BLACK_KING)
       && abs(move.from.file - move.to.file) == 2) {
-    cout << "castling";
     if (move.to.file == 2) {  // castling long
       board[3][move.to.rank] = board[0][move.to.rank];
       board[0][move.to.rank] = nullopt;
@@ -576,8 +583,19 @@ void print_board(const Board &board) {
   ));
 }
 
+void print_history(const vector<Move> &history) {
+  const ushort len = history.size();
+  for (ushort mv = 0; mv + 1 < len; mv += 2) {
+    cout << (mv / 2 + 1) << ".\t" << history[mv].algebraic << "\t"
+         << history[mv + 1].algebraic << endl;
+  }
+  if (len % 2) {
+    cout << (len / 2 + 1) << ".\t" << history.back().algebraic << endl;
+  }
+}
+
 int main() {
-  Board board = create_board();
+  Game game;
   Color color = white;
   uint move_no = 0;
   string move;
@@ -589,7 +607,7 @@ int main() {
       move_no += 1;
       cout << "                { Move " << move_no << " }" << endl;
     }
-    print_board(board);
+    print_board(game.board);
     cout << endl;
 
     while (true) {
@@ -600,10 +618,13 @@ int main() {
         }
         cout << (color ? "White> " : "Black> ");
         cin >> move;
-        if (move == "exit" || move == "quit" || move == "q" || move == "") {
+        if (move == "exit" || move == "quit" || move == "") {
           exit = true;
+        } else if (move.starts_with("sum") || move.starts_with("hist")) {
+          print_history(game.history);
+          continue;
         } else {
-          decoded_move = decode_move(board, move, color);
+          decoded_move = decode_move(game.board, move, color);
         }
         break;
       } catch (string err) {
@@ -614,9 +635,10 @@ int main() {
       break;
     }
 
-    cout << endl;
-    apply_move(board, decoded_move);
+    apply_move(game.board, decoded_move);
+    game.history.push_back((decoded_move));
     color = invert(color);
+    cout << endl;
   }
 
   cout << "\nBye." << endl;
