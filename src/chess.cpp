@@ -125,7 +125,7 @@ struct Square {
   uint8_t rank;
 
   bool exists() const {
-    return 0 <= file && file <= 7 && 0 <= rank && rank <= 7;
+    return file <= 7 && rank <= 7;  // always >= 0 due to unsinged
   }
 };
 
@@ -139,6 +139,7 @@ Square get_square(const char file, const char rank) {
   return Square{
       static_cast<uint8_t>((file - 'a')), static_cast<uint8_t>((rank - '1'))};
 }
+
 Square get_square(const string &square) {
   return get_square(square[0], square[1]);
 }
@@ -207,7 +208,7 @@ vector<Square> find_line_moving_pieces(
     optional<uint8_t> rank = nullopt
 ) {
   vector<Square> found;
-  for (const auto [d_file, d_rank] : directions) {
+  for (const auto &[d_file, d_rank] : directions) {
     for (uint8_t offset = 1;; ++offset) {
       Square square = {
           static_cast<uint8_t>(target_square.file + offset * d_file),
@@ -237,7 +238,7 @@ vector<Square> find_direct_moving_pieces(
     optional<uint8_t> rank = nullopt
 ) {
   vector<Square> found;
-  for (const auto [d_file, d_rank] : moves) {
+  for (const auto &[d_file, d_rank] : moves) {
     Square square = {
         static_cast<uint8_t>(target_square.file + d_file),
         static_cast<uint8_t>(target_square.rank + d_rank)};
@@ -340,7 +341,6 @@ Move decode_move(const Board &board, const string &move, const Color color) {
   mv.algebraic = move;
   mv.check = false;
   const int8_t forwards = color ? 1 : -1;
-  const uint8_t len = move.size();
   smatch match;
 
   if (regex_match(move, match, PAWN_MOVE_PATTERN)) {  // "e4"
@@ -562,7 +562,7 @@ array<string, size> concat_lines(
     const array<string, size> &a, const array<string, size> &b
 ) {
   array<string, size> result = {};
-  for (int i = 0; i < size; ++i) {
+  for (u_long i = 0; i < size; ++i) {
     result[i] = a[i] + b[i];
   }
   return result;
