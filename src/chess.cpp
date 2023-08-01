@@ -56,15 +56,17 @@ ColorPiece invert(ColorPiece piece) {
 }
 
 string to_string(const ColorPiece &piece) {
-  static const map<Piece, array<string, 2>> UTF8_PIECES{
-      {king, {"♔", "♚"}},
-      {queen, {"♕", "♛"}},
-      {rook, {"♖", "♜"}},
-      {bishop, {"♗", "♝"}},
-      {knight, {"♘", "♞"}},
-      {pawn, {"♙", "♟︎"}},
+  static const array<array<string, 2>, 6> UTF8_PIECES = {
+      {
+          {"♙", "♟︎"},
+          {"♘", "♞"},
+          {"♗", "♝"},
+          {"♖", "♜"},
+          {"♕", "♛"},
+          {"♔", "♚"},
+      },
   };
-  return UTF8_PIECES.at(piece.piece)[piece.color];
+  return UTF8_PIECES[piece.piece][piece.color];
 }
 
 const ColorPiece WHITE_PAWN = {white, pawn};
