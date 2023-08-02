@@ -162,6 +162,11 @@ struct Game {
   vector<Move> history = {};
   Color turn = white;
 
+  struct CanCastle {
+    bool king_side;
+    bool queen_side;
+  };
+  array<CanCastle, 2> can_castle = {{{true, true}, {true, true}}};
 };
 
 
@@ -457,9 +462,13 @@ Move decode_move(const Game &game, const string &move) {
     }
 
   } else if (regex_match(move, match, CASTLING_PATTERN)) {
-    // TODO check castling rights
     // TODO check king passing squares under check
     const bool castle_long = match[1].matched;
+    if (castle_long ? !can_castle[turn].king_side
+                    : !can_castle[turn].queen_side) {
+      throw string("You can no longer castle on this side, the King or Rook "
+                   "has already moved.");
+    }
     const uint8_t rank = white ? 0 : 7;
     if (board[4][rank] != ColorPiece{turn, king}
         || (castle_long
@@ -509,9 +518,22 @@ void apply_move(Game &game, const Move &move) {
     if (move.to.file == 2) {  // castling long
       board[3][move.to.rank] = board[0][move.to.rank];
       board[0][move.to.rank] = nullopt;
+      can_castle[turn].queen_side = false;
     } else {  // castling short
       board[5][move.to.rank] = board[7][move.to.rank];
       board[7][move.to.rank] = nullopt;
+      can_castle[turn].king_side = false;
+    }
+  }
+  if (move.from.rank == (turn ? 0 : 7)) {
+    if (move.piece.piece == king) {
+      can_castle[turn] = {false, false};
+    } else if (move.piece.piece == rook) {
+      if (move.from.file == 0) {
+        can_castle[turn].queen_side = false;
+      } else if (move.from.file == 7) {
+        can_castle[turn].queen_side = false;
+      }
     }
   }
 
