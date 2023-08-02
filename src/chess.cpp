@@ -33,12 +33,12 @@ Color invert(const Color color) {
 }
 
 enum Piece : uint8_t {
-  pawn,
-  knight,
-  bishop,
-  rook,
-  queen,
-  king,
+  PAWN,
+  KNIGHT,
+  BISHOP,
+  ROOK,
+  QUEEN,
+  KING,
 };
 
 struct ColorPiece {
@@ -69,18 +69,18 @@ string to_string(const ColorPiece &piece) {
   return UTF8_PIECES[piece.piece][piece.color];
 }
 
-const ColorPiece WHITE_PAWN = {white, pawn};
-const ColorPiece WHITE_KNIGHT = {white, knight};
-const ColorPiece WHITE_BISHOP = {white, bishop};
-const ColorPiece WHITE_ROOK = {white, rook};
-const ColorPiece WHITE_QUEEN = {white, queen};
-const ColorPiece WHITE_KING = {white, king};
-const ColorPiece BLACK_PAWN = {black, pawn};
-const ColorPiece BLACK_KNIGHT = {black, knight};
-const ColorPiece BLACK_BISHOP = {black, bishop};
-const ColorPiece BLACK_ROOK = {black, rook};
-const ColorPiece BLACK_QUEEN = {black, queen};
-const ColorPiece BLACK_KING = {black, king};
+const ColorPiece WHITE_PAWN = {white, PAWN};
+const ColorPiece WHITE_KNIGHT = {white, KNIGHT};
+const ColorPiece WHITE_BISHOP = {white, BISHOP};
+const ColorPiece WHITE_ROOK = {white, ROOK};
+const ColorPiece WHITE_QUEEN = {white, QUEEN};
+const ColorPiece WHITE_KING = {white, KING};
+const ColorPiece BLACK_PAWN = {black, PAWN};
+const ColorPiece BLACK_KNIGHT = {black, KNIGHT};
+const ColorPiece BLACK_BISHOP = {black, BISHOP};
+const ColorPiece BLACK_ROOK = {black, ROOK};
+const ColorPiece BLACK_QUEEN = {black, QUEEN};
+const ColorPiece BLACK_KING = {black, KING};
 
 typedef array<array<optional<ColorPiece>, 8>, 8> Board;
 
@@ -181,17 +181,17 @@ static const string PIECE_CHARS = "NBRQK";
 ColorPiece get_piece(const char piece_character, const Color color) {
   switch (piece_character) {
     case 'K':
-      return {color, king};
+      return {color, KING};
     case 'Q':
-      return {color, queen};
+      return {color, QUEEN};
     case 'R':
-      return {color, rook};
+      return {color, ROOK};
     case 'B':
-      return {color, bishop};
+      return {color, BISHOP};
     case 'N':
-      return {color, knight};
+      return {color, KNIGHT};
     case 'P':
-      return {color, pawn};
+      return {color, PAWN};
     default:
       string piece_str;
       piece_str = piece_character;
@@ -275,33 +275,33 @@ vector<Square> find_pieces(
 ) {
   switch (piece.piece) {
       // clang-format off
-    case knight:
+    case KNIGHT:
       return find_direct_moving_pieces(
           board, target_square, piece,
           {{{+1, +2}, {+1, -2}, {-1, +2}, {-1, -2},
             {+2, +1}, {+2, -1}, {-2, +1}, {-2, -1}}},
           file, rank
       );
-    case bishop:
+    case BISHOP:
       return find_line_moving_pieces<4>(
           board, target_square, piece,
           {{{-1, -1}, {+1, -1}, {-1, +1}, {+1, +1}}},
           file, rank
       );
-    case rook:
+    case ROOK:
       return find_line_moving_pieces<4>(
           board, target_square, piece,
           {{{0, -1}, {0, +1}, {-1, 0}, {+1, 0}}},
           file, rank
       );
-    case queen:
+    case QUEEN:
       return find_line_moving_pieces<8>(
           board, target_square, piece,
           {{{-1, -1}, {+1, -1}, {-1, +1}, {+1, +1},
             { 0, -1}, { 0, +1}, {-1,  0}, {+1,  0}}},
           file, rank
       );
-    case king:
+    case KING:
       return find_direct_moving_pieces(
           board, target_square, piece,
           {{{-1, -1}, {+1, -1}, {-1, +1}, {+1, +1},
@@ -481,15 +481,15 @@ Move decode_move(const Game &game, const string &move) {
                    "has already moved.");
     }
     const uint8_t rank = white ? 0 : 7;
-    if (board[4][rank] != ColorPiece{turn, king}
+    if (board[4][rank] != ColorPiece{turn, KING}
         || (castle_long
-                ? board[0][rank] != ColorPiece{turn, rook} || board[1][rank]
+                ? board[0][rank] != ColorPiece{turn, ROOK} || board[1][rank]
                       || board[2][rank] && !board[3][rank]
-                : board[7][rank] != ColorPiece{turn, rook} || board[6][rank]
+                : board[7][rank] != ColorPiece{turn, ROOK} || board[6][rank]
                       || board[5][rank])) {
       throw string("You can't castle on this side of the board right now.");
     }
-    mv.piece = ColorPiece{turn, king};
+    mv.piece = ColorPiece{turn, KING};
     mv.from = Square{4, rank};
     mv.to = Square{static_cast<uint8_t>(castle_long ? 2 : 6), rank};
 
@@ -515,7 +515,7 @@ void apply_move(Game &game, const Move &move) {
 
   // capture en passant
   const optional<ColorPiece> capture = board[move.to.file][move.to.rank];
-  if (!capture && move.capture == ColorPiece(invert(piece.color), pawn)) {
+  if (!capture && move.capture == ColorPiece(invert(piece.color), PAWN)) {
     board[move.to.file][move.from.rank] = nullopt;
   }
 
@@ -537,9 +537,9 @@ void apply_move(Game &game, const Move &move) {
     }
   }
   if (move.from.rank == (turn ? 0 : 7)) {
-    if (move.piece.piece == king) {
+    if (move.piece.piece == KING) {
       can_castle[turn] = {false, false};
-    } else if (move.piece.piece == rook) {
+    } else if (move.piece.piece == ROOK) {
       if (move.from.file == 0) {
         can_castle[turn].queen_side = false;
       } else if (move.from.file == 7) {
