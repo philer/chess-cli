@@ -158,10 +158,10 @@ struct Move {
 };
 
 struct Game {
-  Board board;
-  vector<Move> history;
+  Board board = create_board();
+  vector<Move> history = {};
+  Color turn = white;
 
-  Game() : board(create_board()), history({}){};
 };
 
 
@@ -205,7 +205,7 @@ vector<Square> find_line_moving_pieces(
     const Board &board,
     const Square &target_square,
     const ColorPiece &piece,
-    const array<tuple<int8_t, int8_t>, N> &directions,
+    const array<pair<int8_t, int8_t>, N> &directions,
     optional<uint8_t> file = nullopt,
     optional<uint8_t> rank = nullopt
 ) {
@@ -235,7 +235,7 @@ vector<Square> find_direct_moving_pieces(
     const Board &board,
     const Square &target_square,
     const ColorPiece &piece,
-    const array<tuple<int8_t, int8_t>, 8> &moves,
+    const array<pair<int8_t, int8_t>, 8> &moves,
     optional<uint8_t> file = nullopt,
     optional<uint8_t> rank = nullopt
 ) {
@@ -338,22 +338,23 @@ optional<ColorPiece> get_promotion(
  * TODO check castling rights
  * TODO check for checks & mate
  */
-Move decode_move(const Board &board, const string &move, const Color color) {
+Move decode_move(const Game &game, const string &move) {
+  const auto &[board, history, turn, can_castle] = game;
   Move mv;
   mv.algebraic = move;
   mv.check = false;
-  const int8_t forwards = color ? 1 : -1;
+  const int8_t forwards = turn ? 1 : -1;
   smatch match;
 
   if (regex_match(move, match, PAWN_MOVE_PATTERN)) {  // "e4"
-    mv.piece = get_piece('P', color);
+    mv.piece = get_piece('P', turn);
     mv.to = get_square(match[1]);
     mv.from.file = mv.to.file;
 
     if (board[mv.from.file][mv.to.rank - forwards] == mv.piece) {
       mv.from.rank = mv.to.rank - forwards;
 
-    } else if ((color && mv.to.rank == 3 || !color && mv.to.rank == 4) &&
+    } else if ((turn && mv.to.rank == 3 || !turn && mv.to.rank == 4) &&
                !board[mv.from.file][mv.to.rank - forwards] &&
                board[mv.from.file][mv.to.rank - 2 * forwards] == mv.piece) {
       // Move two spaces from starting rank
@@ -377,10 +378,10 @@ Move decode_move(const Board &board, const string &move, const Color color) {
       );
     }
 
-    mv.promotion = get_promotion(mv, color, match[2]);
+    mv.promotion = get_promotion(mv, turn, match[2]);
 
   } else if (regex_match(move, match, PAWN_CAPTURE_PATTERN)) {  // "dxe4"
-    mv.piece = get_piece('P', color);
+    mv.piece = get_piece('P', turn);
     mv.to = get_square(match[2]);
     mv.from = get_square(move[0], move[3] - forwards);
     if (abs(mv.from.file - mv.to.file) != 1) {
@@ -395,7 +396,7 @@ Move decode_move(const Board &board, const string &move, const Color color) {
       // TODO check if opponent's pawn just moved by two ranks
       const optional<ColorPiece> en_passant_capture =
           find_piece(board, get_square(move[2], move[3] - forwards));
-      if (en_passant_capture == ColorPiece{invert(color), pawn}) {
+      if (en_passant_capture == ColorPiece{invert(turn), pawn}) {
         mv.capture = en_passant_capture;
       } else {
         throw string(
@@ -403,15 +404,15 @@ Move decode_move(const Board &board, const string &move, const Color color) {
         );
       }
     }
-    if (color == mv.capture->color) {
+    if (turn == mv.capture->color) {
       throw string("Can't capture your own piece.");
     }
 
-    mv.promotion = get_promotion(mv, color, match[3]);
+    mv.promotion = get_promotion(mv, turn, match[3]);
 
   } else if (regex_match(move, match, PIECE_MOVE_OR_CAPTURE_PATTERN)) {
     // "Qe4, Qxe4, Qde4, Qdxe4, Q3e4, Q3xe4, Qd3e4, Qd3xe4"
-    mv.piece = get_piece(move[0], color);
+    mv.piece = get_piece(move[0], turn);
     mv.to = get_square(match[5]);
 
     // Decode optional starting square qualifiers
@@ -444,14 +445,14 @@ Move decode_move(const Board &board, const string &move, const Color color) {
         throw string(
             "There is nothing to capture on " + to_string(mv.to) + "."
         );
-      } else if (color == mv.capture->color) {
+      } else if (turn == mv.capture->color) {
         throw string("Can't capture your own piece.");
       }
     } else {
       if (mv.capture) {
         throw string("Target square is occupied")
-            + (color == mv.capture->color ? " by your own piece."
-                                          : ", add 'x' to capture.");
+            + (turn == mv.capture->color ? " by your own piece."
+                                         : ", add 'x' to capture.");
       }
     }
 
@@ -460,15 +461,15 @@ Move decode_move(const Board &board, const string &move, const Color color) {
     // TODO check king passing squares under check
     const bool castle_long = match[1].matched;
     const uint8_t rank = white ? 0 : 7;
-    if (board[4][rank] != ColorPiece{color, king}
+    if (board[4][rank] != ColorPiece{turn, king}
         || (castle_long
-                ? board[0][rank] != ColorPiece{color, rook} || board[1][rank]
+                ? board[0][rank] != ColorPiece{turn, rook} || board[1][rank]
                       || board[2][rank] && !board[3][rank]
-                : board[7][rank] != ColorPiece{color, rook} || board[6][rank]
+                : board[7][rank] != ColorPiece{turn, rook} || board[6][rank]
                       || board[5][rank])) {
       throw string("You can't castle on this side of the board right now.");
     }
-    mv.piece = ColorPiece{color, king};
+    mv.piece = ColorPiece{turn, king};
     mv.from = Square{4, rank};
     mv.to = Square{static_cast<uint8_t>(castle_long ? 2 : 6), rank};
 
@@ -488,7 +489,8 @@ Move decode_move(const Board &board, const string &move, const Color color) {
  * checks have passed and that it can be applied to the given board to create a
  * valid game state.
  */
-void apply_move(Board &board, const Move &move) {
+void apply_move(Game &game, const Move &move) {
+  auto &[board, history, turn, can_castle] = game;
   const ColorPiece piece = *board[move.from.file][move.from.rank];
 
   // capture en passant
@@ -512,6 +514,9 @@ void apply_move(Board &board, const Move &move) {
       board[7][move.to.rank] = nullopt;
     }
   }
+
+  history.push_back(move);
+  turn = invert(turn);
 }
 
 // const string ANSI_RED = "\033[31m";
@@ -600,27 +605,25 @@ void print_history(const vector<Move> &history) {
 
 int main() {
   Game game;
-  Color color = white;
-  uint move_no = 0;
-  string move;
-  Move decoded_move;
 
   bool exit = false;
   while (true) {
-    if (color) {
-      move_no += 1;
-      cout << "                { Move " << move_no << " }" << endl;
+    if (game.turn) {
+      cout << "                { Move " << (game.history.size() + 1) << " }"
+           << endl;
     }
     print_board(game.board);
     cout << endl;
 
+    string move;
+    Move decoded_move;
     while (true) {
       try {
         if (cin.eof()) {
           exit = true;
           break;
         }
-        cout << (color ? "White> " : "Black> ");
+        cout << (game.turn ? "White> " : "Black> ");
         cin >> move;
         if (move == "exit" || move == "quit" || move == "") {
           exit = true;
@@ -628,7 +631,7 @@ int main() {
           print_history(game.history);
           continue;
         } else {
-          decoded_move = decode_move(game.board, move, color);
+          decoded_move = decode_move(game, move);
         }
         break;
       } catch (string err) {
@@ -639,9 +642,7 @@ int main() {
       break;
     }
 
-    apply_move(game.board, decoded_move);
-    game.history.push_back((decoded_move));
-    color = invert(color);
+    apply_move(game, decoded_move);
     cout << endl;
   }
 
