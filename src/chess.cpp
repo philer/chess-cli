@@ -126,6 +126,10 @@ struct Square {
   uint8_t file;
   uint8_t rank;
 
+  bool operator==(Square &other) const {
+    return file == other.file && rank == other.rank;
+  }
+
   bool exists() const {
     return file <= 7 && rank <= 7;  // always >= 0 due to unsinged
   }
@@ -401,8 +405,15 @@ Move decode_move(const Game &game, const string &move) {
       // TODO check if opponent's pawn just moved by two ranks
       const optional<ColorPiece> en_passant_capture =
           find_piece(board, get_square(move[2], move[3] - forwards));
-      if (en_passant_capture == ColorPiece{invert(turn), pawn}) {
-        mv.capture = en_passant_capture;
+      if (en_passant_capture == invert(mv.piece)) {
+        Move previous = history.back();
+        if (previous.piece == invert(mv.piece)
+            && previous.from == get_square(move[2], move[3] + forwards)) {
+          mv.capture = en_passant_capture;
+        } else {
+          throw string("Can't capture en passant, the opposing pawn was moved "
+                       "too long ago.");
+        }
       } else {
         throw string(
             "There is nothing to capture on " + to_string(mv.to) + "."
