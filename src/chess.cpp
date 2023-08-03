@@ -126,7 +126,7 @@ struct Square {
   uint8_t file;
   uint8_t rank;
 
-  bool operator==(Square &other) const {
+  bool operator==(const Square &other) const {
     return file == other.file && rank == other.rank;
   }
 
@@ -173,11 +173,6 @@ struct Game {
   array<CanCastle, 2> can_castle = {{{true, true}, {true, true}}};
 };
 
-
-// Disallowing lower case piece letters for now.
-// Ambiguous case: "bc6" could be a bishop or a pawn capture
-static const string PIECE_CHARS = "NBRQK";
-
 ColorPiece get_piece(const char piece_character, const Color color) {
   switch (piece_character) {
     case 'K':
@@ -203,12 +198,6 @@ optional<ColorPiece> find_piece(const Board &board, const Square &square) {
   return board[square.file][square.rank];
 }
 
-bool has_piece(
-    const Board &board, const Square &square, const ColorPiece &piece
-) {
-  return board[square.file][square.rank] == piece;
-}
-
 template <size_t N>
 vector<Square> find_line_moving_pieces(
     const Board &board,
@@ -227,7 +216,7 @@ vector<Square> find_line_moving_pieces(
       if (!square.exists()) {
         break;
       }
-      const optional<ColorPiece> found_piece = find_piece(board, square);
+      const optional<ColorPiece> &found_piece = find_piece(board, square);
       if (found_piece && found_piece == piece && (!file || square.file == file)
           && (!rank || square.rank == rank)) {
         found.push_back(square);
@@ -390,13 +379,13 @@ Move decode_move(const Game &game, const string &move) {
     mv.promotion = get_promotion(mv, turn, match[2]);
 
   } else if (regex_match(move, match, PAWN_CAPTURE_PATTERN)) {  // "dxe4"
-    mv.piece = get_piece('P', turn);
+    mv.piece = {turn, PAWN};
     mv.to = get_square(match[2]);
     mv.from = get_square(move[0], move[3] - forwards);
     if (abs(mv.from.file - mv.to.file) != 1) {
       throw string("Pawn must move one square diagonally when capturing.");
     }
-    if (!has_piece(board, mv.from, mv.piece)) {
+    if (board[mv.from.file][mv.from.rank] != mv.piece) {
       throw string("No eligible Pawn on " + to_string(mv.from) + ".");
     }
     mv.capture = find_piece(board, mv.to);
@@ -406,7 +395,7 @@ Move decode_move(const Game &game, const string &move) {
       const optional<ColorPiece> en_passant_capture =
           find_piece(board, get_square(move[2], move[3] - forwards));
       if (en_passant_capture == invert(mv.piece)) {
-        Move previous = history.back();
+        const Move &previous = history.back();
         if (previous.piece == invert(mv.piece)
             && previous.from == get_square(move[2], move[3] + forwards)) {
           mv.capture = en_passant_capture;
@@ -511,10 +500,10 @@ Move decode_move(const Game &game, const string &move) {
  */
 void apply_move(Game &game, const Move &move) {
   auto &[board, history, turn, can_castle] = game;
-  const ColorPiece piece = *board[move.from.file][move.from.rank];
+  const ColorPiece &piece = *board[move.from.file][move.from.rank];
 
   // capture en passant
-  const optional<ColorPiece> capture = board[move.to.file][move.to.rank];
+  const optional<ColorPiece> &capture = board[move.to.file][move.to.rank];
   if (!capture && move.capture == ColorPiece(invert(piece.color), PAWN)) {
     board[move.to.file][move.from.rank] = nullopt;
   }
@@ -610,7 +599,7 @@ array<string, size> concat_lines(
 
 template <size_t size> string join_lines(const array<string, size> &lines) {
   string result = "";
-  for (string line : lines) {
+  for (const string &line : lines) {
     result += line + "\n";
   }
   return result;
