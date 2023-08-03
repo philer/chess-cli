@@ -28,7 +28,7 @@ enum Color : bool {
 };
 
 // Overloading operator! to return Color instead of bool leads to segfault
-Color invert(const Color color) {
+constexpr Color invert(const Color color) {
   return static_cast<Color>(!color);
 }
 
@@ -47,12 +47,12 @@ struct ColorPiece {
   Color color;
   Piece piece;
 
-  bool operator==(const ColorPiece &other) const {
+  constexpr bool operator==(const ColorPiece &other) const {
     return color == other.color && piece == other.piece;
   }
 };
 
-ColorPiece invert(ColorPiece piece) {
+constexpr ColorPiece invert(ColorPiece piece) {
   piece.color = invert(piece.color);
   return piece;
 }
@@ -103,11 +103,11 @@ struct Square {
   uint8_t file;
   uint8_t rank;
 
-  bool operator==(const Square &other) const {
+  constexpr bool operator==(const Square &other) const {
     return file == other.file && rank == other.rank;
   }
 
-  bool exists() const {
+  constexpr bool exists() const {
     return file <= 7 && rank <= 7;  // always >= 0 due to unsinged
   }
 };
@@ -118,7 +118,7 @@ string to_string(const Square &square) {
       static_cast<char>((square.rank + '1'))};
 }
 
-Square get_square(const char file, const char rank) {
+constexpr Square get_square(const char file, const char rank) {
   return Square{
       static_cast<uint8_t>((file - 'a')), static_cast<uint8_t>((rank - '1'))};
 }
@@ -150,7 +150,7 @@ struct Game {
   array<CanCastle, 2> can_castle = {{{true, true}, {true, true}}};
 };
 
-ColorPiece get_piece(const char piece_character, const Color color) {
+constexpr ColorPiece get_piece(const char piece_character, const Color color) {
   switch (piece_character) {
     case 'K':
       return {color, KING};
@@ -165,13 +165,13 @@ ColorPiece get_piece(const char piece_character, const Color color) {
     case 'P':
       return {color, PAWN};
     default:
-      string piece_str;
-      piece_str = piece_character;
-      throw string("Invalid piece '" + piece_str + "'");
+      throw string("Invalid piece '") + piece_character + "'";
   }
 }
 
-optional<ColorPiece> get_piece(const Board &board, const Square &square) {
+constexpr optional<ColorPiece> get_piece(
+    const Board &board, const Square &square
+) {
   return board[square.file][square.rank];
 }
 
@@ -193,8 +193,8 @@ vector<Square> find_line_attacking_pieces(
     const Square &target_square,
     const ColorPiece &piece,
     const array<pair<int8_t, int8_t>, N> &directions,
-    optional<uint8_t> file = nullopt,
-    optional<uint8_t> rank = nullopt
+    const optional<uint8_t> file = nullopt,
+    const optional<uint8_t> rank = nullopt
 ) {
   vector<Square> found;
   for (const auto &[d_file, d_rank] : directions) {
@@ -224,8 +224,8 @@ vector<Square> find_direct_attacking_pieces(
     const Square &target_square,
     const ColorPiece &piece,
     const array<pair<int8_t, int8_t>, N> &moves,
-    optional<uint8_t> file = nullopt,
-    optional<uint8_t> rank = nullopt
+    const optional<uint8_t> file = nullopt,
+    const optional<uint8_t> rank = nullopt
 ) {
   vector<Square> found;
   for (const auto &[d_file, d_rank] : moves) {
@@ -249,8 +249,8 @@ vector<Square> find_attacking_pieces(
     const Board &board,
     const Square &target_square,
     const ColorPiece &piece,
-    optional<uint8_t> file = nullopt,
-    optional<uint8_t> rank = nullopt
+    const optional<uint8_t> file = nullopt,
+    const optional<uint8_t> rank = nullopt
 ) {
   switch (piece.piece) {
       // clang-format off
@@ -299,7 +299,7 @@ vector<Square> find_attacking_pieces(
   }
 }
 
-bool is_attacked(
+constexpr bool is_attacked(
     const Board &board, const Square &square, const Color by_color
 ) {
   for (const Piece &piece : PIECE_TYPES) {
@@ -327,7 +327,7 @@ const regex PIECE_MOVE_OR_CAPTURE_PATTERN{
     "^([NBRQK])([a-h])?([1-8])?(x)?([a-h][1-8])(?:\b|$)"};
 const regex CASTLING_PATTERN{"^[O0]-?[O0](-?[O0])?(?:\b|$)", regex::icase};
 
-optional<ColorPiece> get_promotion(
+constexpr optional<ColorPiece> get_promotion(
     const Move &move, const Color color, const ssub_match &promo_match
 ) {
   optional<ColorPiece> promotion = nullopt;
@@ -565,13 +565,13 @@ string invert(const string &str) {
   return ANSI_INVERT + str + ANSI_RESET;
 }
 
-const uint8_t FORWARD_8[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-const uint8_t REVERSE_8[8] = {7, 6, 5, 4, 3, 2, 1, 0};
+constexpr uint8_t FORWARD_8[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+constexpr uint8_t REVERSE_8[8] = {7, 6, 5, 4, 3, 2, 1, 0};
 
-const uint8_t BOARD_HEADER_HEIGHT = 2;
-const uint8_t BOARD_CONTENT_HEIGHT = 8;
-const uint8_t BOARD_FOOTER_HEIGHT = 1;
-const uint8_t BOARD_HEIGHT =
+constexpr uint8_t BOARD_HEADER_HEIGHT = 2;
+constexpr uint8_t BOARD_CONTENT_HEIGHT = 8;
+constexpr uint8_t BOARD_FOOTER_HEIGHT = 1;
+constexpr uint8_t BOARD_HEIGHT =
     BOARD_HEADER_HEIGHT + BOARD_CONTENT_HEIGHT + BOARD_FOOTER_HEIGHT;
 
 array<string, BOARD_HEIGHT> board_to_lines(
