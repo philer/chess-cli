@@ -40,6 +40,8 @@ enum Piece : uint8_t {
   QUEEN,
   KING,
 };
+constexpr array<Piece, 6> PIECE_TYPES = {
+    PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING};
 
 struct ColorPiece {
   Color color;
@@ -69,58 +71,33 @@ string to_string(const ColorPiece &piece) {
   return UTF8_PIECES[piece.piece][piece.color];
 }
 
-const ColorPiece WHITE_PAWN = {white, PAWN};
-const ColorPiece WHITE_KNIGHT = {white, KNIGHT};
-const ColorPiece WHITE_BISHOP = {white, BISHOP};
-const ColorPiece WHITE_ROOK = {white, ROOK};
-const ColorPiece WHITE_QUEEN = {white, QUEEN};
-const ColorPiece WHITE_KING = {white, KING};
-const ColorPiece BLACK_PAWN = {black, PAWN};
-const ColorPiece BLACK_KNIGHT = {black, KNIGHT};
-const ColorPiece BLACK_BISHOP = {black, BISHOP};
-const ColorPiece BLACK_ROOK = {black, ROOK};
-const ColorPiece BLACK_QUEEN = {black, QUEEN};
-const ColorPiece BLACK_KING = {black, KING};
+constexpr ColorPiece WHITE_PAWN = {white, PAWN};
+constexpr ColorPiece WHITE_KNIGHT = {white, KNIGHT};
+constexpr ColorPiece WHITE_BISHOP = {white, BISHOP};
+constexpr ColorPiece WHITE_ROOK = {white, ROOK};
+constexpr ColorPiece WHITE_QUEEN = {white, QUEEN};
+constexpr ColorPiece WHITE_KING = {white, KING};
+constexpr ColorPiece BLACK_PAWN = {black, PAWN};
+constexpr ColorPiece BLACK_KNIGHT = {black, KNIGHT};
+constexpr ColorPiece BLACK_BISHOP = {black, BISHOP};
+constexpr ColorPiece BLACK_ROOK = {black, ROOK};
+constexpr ColorPiece BLACK_QUEEN = {black, QUEEN};
+constexpr ColorPiece BLACK_KING = {black, KING};
 
 typedef array<array<optional<ColorPiece>, 8>, 8> Board;
 
-Board create_board() {
-  Board board;
-  // empty squares
-  for (uint8_t rank = 2; rank < 6; ++rank) {
-    for (uint8_t file = 0; file < 8; ++file) {
-      board[file][rank] = nullopt;
-    }
-  }
-
-  // pawns
-  for (uint8_t file = 0; file < 8; ++file) {
-    board[file][1] = WHITE_PAWN;
-    board[file][6] = BLACK_PAWN;
-  }
-
-  // white pieces
-  board[0][0] = WHITE_ROOK;
-  board[1][0] = WHITE_KNIGHT;
-  board[2][0] = WHITE_BISHOP;
-  board[3][0] = WHITE_QUEEN;
-  board[4][0] = WHITE_KING;
-  board[5][0] = WHITE_BISHOP;
-  board[6][0] = WHITE_KNIGHT;
-  board[7][0] = WHITE_ROOK;
-
-  // black pieces
-  board[0][7] = BLACK_ROOK;
-  board[1][7] = BLACK_KNIGHT;
-  board[2][7] = BLACK_BISHOP;
-  board[3][7] = BLACK_QUEEN;
-  board[4][7] = BLACK_KING;
-  board[5][7] = BLACK_BISHOP;
-  board[6][7] = BLACK_KNIGHT;
-  board[7][7] = BLACK_ROOK;
-
-  return board;
-}
+// clang-format off
+constexpr Board STARTING_BOARD = {{
+  {WHITE_ROOK,   WHITE_PAWN, {}, {}, {}, {}, BLACK_PAWN, BLACK_ROOK},
+  {WHITE_KNIGHT, WHITE_PAWN, {}, {}, {}, {}, BLACK_PAWN, BLACK_KNIGHT},
+  {WHITE_BISHOP, WHITE_PAWN, {}, {}, {}, {}, BLACK_PAWN, BLACK_BISHOP},
+  {WHITE_QUEEN,  WHITE_PAWN, {}, {}, {}, {}, BLACK_PAWN, BLACK_QUEEN},
+  {WHITE_KING,   WHITE_PAWN, {}, {}, {}, {}, BLACK_PAWN, BLACK_KING},
+  {WHITE_BISHOP, WHITE_PAWN, {}, {}, {}, {}, BLACK_PAWN, BLACK_BISHOP},
+  {WHITE_KNIGHT, WHITE_PAWN, {}, {}, {}, {}, BLACK_PAWN, BLACK_KNIGHT},
+  {WHITE_ROOK,   WHITE_PAWN, {}, {}, {}, {}, BLACK_PAWN, BLACK_ROOK},
+}};
+// clang-format on
 
 struct Square {
   uint8_t file;
@@ -162,7 +139,7 @@ struct Move {
 };
 
 struct Game {
-  Board board = create_board();
+  Board board = STARTING_BOARD;
   vector<Move> history = {};
   Color turn = white;
 
@@ -325,7 +302,7 @@ vector<Square> find_attacking_pieces(
 bool is_attacked(
     const Board &board, const Square &square, const Color by_color
 ) {
-  for (const Piece &piece : {PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING}) {
+  for (const Piece &piece : PIECE_TYPES) {
     if (!find_attacking_pieces(board, square, {by_color, piece}).empty()) {
       return true;
     }
@@ -673,30 +650,34 @@ int main() {
       cout << "                "
            << "{ Move " << (game.history.size() + 1) << " }" << endl;
     }
+    cout << endl;
     print_board(game.board);
     cout << endl;
 
     while (true) {
       cout << (game.turn ? "White> " : "Black> ");
-      string move;
-      cin >> move;
+      string input;
+      cin >> input;
       if (cin.eof()) {
         exit = true;
         break;
       }
 
-      if (move == "exit" || move == "quit" || move == "") {
+      if (input.starts_with("sum") || input.starts_with("hist")) {
+        print_history(game.history);
+
+      } else if (input == "exit" || input == "quit" || input == "") {
         exit = true;
 
-      } else if (move.starts_with("sum") || move.starts_with("hist")) {
-        print_history(game.history);
-        continue;
+      } else if (input == "restart" || input == "reset") {
+        game = Game();
+        break;
 
       } else {
         try {
-          Move decoded_move = decode_move(game, move);
+          Move move = decode_move(game, input);
           Game updated = game;
-          apply_move(updated, decoded_move);
+          apply_move(updated, move);
           if (is_in_check(updated, game.turn)) {
             throw string("You are in check.");
           } else {
