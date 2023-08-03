@@ -194,12 +194,24 @@ ColorPiece get_piece(const char piece_character, const Color color) {
   }
 }
 
-optional<ColorPiece> find_piece(const Board &board, const Square &square) {
+optional<ColorPiece> get_piece(const Board &board, const Square &square) {
   return board[square.file][square.rank];
 }
 
+vector<Square> find_pieces(const Board &board, const ColorPiece &piece) {
+  vector<Square> squares;
+  for (uint8_t file = 0; file < 8; ++file) {
+    for (uint8_t rank = 0; rank < 8; ++rank) {
+      if (board[file][rank] == piece) {
+        squares.push_back({file, rank});
+      }
+    }
+  }
+  return squares;
+}
+
 template <size_t N>
-vector<Square> find_line_moving_pieces(
+vector<Square> find_line_attacking_pieces(
     const Board &board,
     const Square &target_square,
     const ColorPiece &piece,
@@ -216,7 +228,7 @@ vector<Square> find_line_moving_pieces(
       if (!square.exists()) {
         break;
       }
-      const optional<ColorPiece> &found_piece = find_piece(board, square);
+      const optional<ColorPiece> &found_piece = get_piece(board, square);
       if (found_piece && found_piece == piece && (!file || square.file == file)
           && (!rank || square.rank == rank)) {
         found.push_back(square);
@@ -229,11 +241,12 @@ vector<Square> find_line_moving_pieces(
   return found;
 }
 
-vector<Square> find_direct_moving_pieces(
+template <size_t N>
+vector<Square> find_direct_attacking_pieces(
     const Board &board,
     const Square &target_square,
     const ColorPiece &piece,
-    const array<pair<int8_t, int8_t>, 8> &moves,
+    const array<pair<int8_t, int8_t>, N> &moves,
     optional<uint8_t> file = nullopt,
     optional<uint8_t> rank = nullopt
 ) {
@@ -248,14 +261,14 @@ vector<Square> find_direct_moving_pieces(
     if (file && square.file != *file || rank && square.rank != *rank) {
       continue;
     }
-    if (find_piece(board, square) == piece) {
+    if (get_piece(board, square) == piece) {
       found.push_back(square);
     }
   }
   return found;
 }
 
-vector<Square> find_pieces(
+vector<Square> find_attacking_pieces(
     const Board &board,
     const Square &target_square,
     const ColorPiece &piece,
@@ -264,34 +277,40 @@ vector<Square> find_pieces(
 ) {
   switch (piece.piece) {
       // clang-format off
+    case PAWN:
+      return find_direct_attacking_pieces<2>(
+          board, target_square, piece,
+          {{{piece.color ? -1 : +1, -1}, {piece.color ? -1 : +1, +1}}},
+          file, rank
+      );
     case KNIGHT:
-      return find_direct_moving_pieces(
+      return find_direct_attacking_pieces<8>(
           board, target_square, piece,
           {{{+1, +2}, {+1, -2}, {-1, +2}, {-1, -2},
             {+2, +1}, {+2, -1}, {-2, +1}, {-2, -1}}},
           file, rank
       );
     case BISHOP:
-      return find_line_moving_pieces<4>(
+      return find_line_attacking_pieces<4>(
           board, target_square, piece,
           {{{-1, -1}, {+1, -1}, {-1, +1}, {+1, +1}}},
           file, rank
       );
     case ROOK:
-      return find_line_moving_pieces<4>(
+      return find_line_attacking_pieces<4>(
           board, target_square, piece,
           {{{0, -1}, {0, +1}, {-1, 0}, {+1, 0}}},
           file, rank
       );
     case QUEEN:
-      return find_line_moving_pieces<8>(
+      return find_line_attacking_pieces<8>(
           board, target_square, piece,
           {{{-1, -1}, {+1, -1}, {-1, +1}, {+1, +1},
             { 0, -1}, { 0, +1}, {-1,  0}, {+1,  0}}},
           file, rank
       );
     case KING:
-      return find_direct_moving_pieces(
+      return find_direct_attacking_pieces<8>(
           board, target_square, piece,
           {{{-1, -1}, {+1, -1}, {-1, +1}, {+1, +1},
             { 0, -1}, { 0, +1}, {-1,  0}, {+1,  0}}},
@@ -299,9 +318,29 @@ vector<Square> find_pieces(
       );
     // clang-format on
     default:
-      throw string("Something went wrong!");
+      throw string("Unknown piece code " + to_string(piece.piece));
   }
 }
+
+bool is_attacked(
+    const Board &board, const Square &square, const Color by_color
+) {
+  for (const Piece &piece : {PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING}) {
+    if (!find_attacking_pieces(board, square, {by_color, piece}).empty()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool is_in_check(const Game &game, Color color) {
+  const vector<Square> &king_squares = find_pieces(game.board, {color, KING});
+  if (king_squares.size() != 1) {
+    throw string("You need exactly one King.");
+  }
+  return is_attacked(game.board, king_squares[0], invert(color));
+}
+
 
 // TODO shortened pawn captures ("exd", "ed")
 const regex PAWN_MOVE_PATTERN{"^([a-h][1-8])(:?=?([NBRQ]))?(?:\b|$)"};
@@ -370,7 +409,7 @@ Move decode_move(const Game &game, const string &move) {
     }
 
     // Prevent illegal capture
-    if (find_piece(board, mv.to)) {
+    if (get_piece(board, mv.to)) {
       throw string(
           to_string(mv.to) + " is blocked. Pawns can only capture diagonally."
       );
@@ -388,12 +427,12 @@ Move decode_move(const Game &game, const string &move) {
     if (board[mv.from.file][mv.from.rank] != mv.piece) {
       throw string("No eligible Pawn on " + to_string(mv.from) + ".");
     }
-    mv.capture = find_piece(board, mv.to);
+    mv.capture = get_piece(board, mv.to);
     if (!mv.capture) {
       // Check for en passant capture
       // TODO check if opponent's pawn just moved by two ranks
       const optional<ColorPiece> en_passant_capture =
-          find_piece(board, get_square(move[2], move[3] - forwards));
+          get_piece(board, get_square(move[2], move[3] - forwards));
       if (en_passant_capture == invert(mv.piece)) {
         const Move &previous = history.back();
         if (previous.piece == invert(mv.piece)
@@ -432,7 +471,7 @@ Move decode_move(const Game &game, const string &move) {
 
     // Search for matching pieces
     const vector<Square> candidates =
-        find_pieces(board, mv.to, mv.piece, from_file, from_rank);
+        find_attacking_pieces(board, mv.to, mv.piece, from_file, from_rank);
     switch (candidates.size()) {
       case 1:
         mv.from = candidates[0];
@@ -444,7 +483,7 @@ Move decode_move(const Game &game, const string &move) {
     }
 
     // Check for captures
-    mv.capture = find_piece(board, mv.to);
+    mv.capture = get_piece(board, mv.to);
     if (match[3].matched) {
       if (!mv.capture) {
         throw string(
@@ -629,42 +668,46 @@ int main() {
   Game game;
 
   bool exit = false;
-  while (true) {
+  while (!exit) {
     if (game.turn) {
-      cout << "                { Move " << (game.history.size() + 1) << " }"
-           << endl;
+      cout << "                "
+           << "{ Move " << (game.history.size() + 1) << " }" << endl;
     }
     print_board(game.board);
     cout << endl;
 
-    string move;
-    Move decoded_move;
     while (true) {
-      try {
-        if (cin.eof()) {
-          exit = true;
-          break;
-        }
-        cout << (game.turn ? "White> " : "Black> ");
-        cin >> move;
-        if (move == "exit" || move == "quit" || move == "") {
-          exit = true;
-        } else if (move.starts_with("sum") || move.starts_with("hist")) {
-          print_history(game.history);
-          continue;
-        } else {
-          decoded_move = decode_move(game, move);
-        }
+      cout << (game.turn ? "White> " : "Black> ");
+      string move;
+      cin >> move;
+      if (cin.eof()) {
+        exit = true;
         break;
-      } catch (string err) {
-        cout << err << endl;
+      }
+
+      if (move == "exit" || move == "quit" || move == "") {
+        exit = true;
+
+      } else if (move.starts_with("sum") || move.starts_with("hist")) {
+        print_history(game.history);
+        continue;
+
+      } else {
+        try {
+          Move decoded_move = decode_move(game, move);
+          Game updated = game;
+          apply_move(updated, decoded_move);
+          if (is_in_check(updated, game.turn)) {
+            throw string("You are in check.");
+          } else {
+            game = updated;
+            break;
+          }
+        } catch (string err) {
+          cout << "Invalid move: " << err << endl;
+        }
       }
     }
-    if (exit) {
-      break;
-    }
-
-    apply_move(game, decoded_move);
     cout << endl;
   }
 
