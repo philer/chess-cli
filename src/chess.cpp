@@ -22,6 +22,10 @@ using namespace std;
  * + highlight available moves for a selected piece
  * */
 
+constexpr uint8_t uint8(uint8_t n) {
+  return n;
+}
+
 enum Color : bool {
   white = true,
   black = false,
@@ -119,8 +123,7 @@ string to_string(const Square &square) {
 }
 
 constexpr Square get_square(const char file, const char rank) {
-  return Square{
-      static_cast<uint8_t>((file - 'a')), static_cast<uint8_t>((rank - '1'))};
+  return Square{uint8((file - 'a')), uint8((rank - '1'))};
 }
 
 Square get_square(const string &square) {
@@ -200,8 +203,8 @@ vector<Square> find_line_attacking_pieces(
   for (const auto &[d_file, d_rank] : directions) {
     for (uint8_t offset = 1;; ++offset) {
       Square square = {
-          static_cast<uint8_t>(target_square.file + offset * d_file),
-          static_cast<uint8_t>(target_square.rank + offset * d_rank)};
+          uint8(target_square.file + offset * d_file),
+          uint8(target_square.rank + offset * d_rank)};
       if (!square.exists()) {
         break;
       }
@@ -230,8 +233,7 @@ vector<Square> find_direct_attacking_pieces(
   vector<Square> found;
   for (const auto &[d_file, d_rank] : moves) {
     Square square = {
-        static_cast<uint8_t>(target_square.file + d_file),
-        static_cast<uint8_t>(target_square.rank + d_rank)};
+        uint8(target_square.file + d_file), uint8(target_square.rank + d_rank)};
     if (!square.exists()) {
       continue;
     }
@@ -376,11 +378,9 @@ Move decode_move(const Game &game, const string &move) {
     } else {
       throw string(
           "There is no eligible Pawn on "
-          + to_string(Square{
-              mv.from.file, static_cast<uint8_t>(mv.to.rank - forwards)})
+          + to_string(Square{mv.from.file, uint8(mv.to.rank - forwards)})
           + " or "
-          + to_string(Square{
-              mv.from.file, static_cast<uint8_t>(mv.to.rank - 2 * forwards)})
+          + to_string(Square{mv.from.file, uint8(mv.to.rank - 2 * forwards)})
           + "."
       );
     }
@@ -496,7 +496,7 @@ Move decode_move(const Game &game, const string &move) {
     }
     mv.piece = ColorPiece{turn, KING};
     mv.from = Square{4, rank};
-    mv.to = Square{static_cast<uint8_t>(castle_long ? 2 : 6), rank};
+    mv.to = Square{uint8(castle_long ? 2 : 6), rank};
 
   } else {
     throw string(
