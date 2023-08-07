@@ -137,7 +137,6 @@ struct Move {
   Square to;
   optional<ColorPiece> capture;
   optional<ColorPiece> promotion;
-  // bool en_passant;  // TODO
   bool check;
 };
 
@@ -350,9 +349,7 @@ constexpr optional<ColorPiece> get_promotion(
  * Extract all relevant details from a move given in algebraic notation on a
  * specific board and check if it is legal to apply.
  *
- * TODO en passant legal
- * TODO check castling rights
- * TODO check for checks & mate
+ * TODO check for mate
  */
 Move decode_move(const Game &game, const string &move) {
   const auto &[board, history, turn, can_castle] = game;
@@ -407,10 +404,10 @@ Move decode_move(const Game &game, const string &move) {
     mv.capture = get_piece(board, mv.to);
     if (!mv.capture) {
       // Check for en passant capture
-      // TODO check if opponent's pawn just moved by two ranks
       const optional<ColorPiece> en_passant_capture =
           get_piece(board, get_square(move[2], move[3] - forwards));
       if (en_passant_capture == invert(mv.piece)) {
+        // check if opponent's pawn just moved by two ranks
         const Move &previous = history.back();
         if (previous.piece == invert(mv.piece)
             && previous.from == get_square(move[2], move[3] + forwards)) {
@@ -478,21 +475,21 @@ Move decode_move(const Game &game, const string &move) {
     }
 
   } else if (regex_match(move, match, CASTLING_PATTERN)) {
-    // TODO check king passing squares under check
     const bool castle_long = match[1].matched;
     if (castle_long ? !can_castle[turn].king_side
                     : !can_castle[turn].queen_side) {
-      throw string("You can no longer castle on this side, the King or Rook "
-                   "has already moved.");
+      throw string("You can no longer castle on this side of the board, "
+                   "the King or Rook has already moved.");
     }
     const uint8_t rank = white ? 0 : 7;
-    if (board[4][rank] != ColorPiece{turn, KING}
-        || (castle_long
-                ? board[0][rank] != ColorPiece{turn, ROOK} || board[1][rank]
-                      || board[2][rank] && !board[3][rank]
-                : board[7][rank] != ColorPiece{turn, ROOK} || board[6][rank]
-                      || board[5][rank])) {
-      throw string("You can't castle on this side of the board right now.");
+    if (castle_long ? board[1][rank] || board[2][rank] || board[3][rank]
+                    : board[6][rank] || board[5][rank]) {
+      throw string("You cannot castle on this side of the board, "
+                   "there is a piece in the way.");
+    }
+    if (is_attacked(board, {uint8(castle_long ? 3 : 5), rank}, invert(turn))) {
+      throw string("You cannot castle on this side of the board, "
+                   "the King may not pass through check.");
     }
     mv.piece = ColorPiece{turn, KING};
     mv.from = Square{4, rank};
