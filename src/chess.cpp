@@ -15,12 +15,15 @@ using namespace std;
  *
  * This program was created for training purposes and is full of experiments –
  * read it at your own risk.
- *
- * Future ideas:
- * + highlight last move
- * + highlight check
- * + highlight available moves for a selected piece
  * */
+
+constexpr char HELP_TEXT[] =
+    ("Welcome to Chess CLI!\n"
+     "Type moves in algebraic chess notation, e.g. 'e4' or 'Bxf4'.\n"
+     "Type 'help' or '?' to view this text.\n"
+     "Type 'quit' or ctrl+d to exit.\n"
+     "Type 'restart'  (or 'res') to start a new game.\n"
+     "Type 'history' (or 'hist') to view a list of previous moves.\n");
 
 constexpr uint8_t uint8(uint8_t n) {
   return n;
@@ -639,6 +642,8 @@ void print_history(const vector<Move> &history) {
 }
 
 int main() {
+  cout << HELP_TEXT << endl;
+
   Game game;
 
   bool exit = false;
@@ -660,13 +665,17 @@ int main() {
         break;
       }
 
-      if (input.starts_with("sum") || input.starts_with("hist")) {
+      if (input == "help" || input == "?") {
+        cout << HELP_TEXT << endl;
+
+      } else if (input.starts_with("sum") || input.starts_with("hist")) {
         print_history(game.history);
 
       } else if (input == "exit" || input == "quit" || input == "") {
         exit = true;
+        break;
 
-      } else if (input == "restart" || input == "reset") {
+      } else if (input.starts_with("res")) {
         game = Game();
         break;
 
